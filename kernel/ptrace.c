@@ -233,7 +233,6 @@ bool ptrace_may_access(struct task_struct *task, unsigned int mode)
 
 static int ptrace_attach(struct task_struct *task)
 {
-	bool wait_trap = false;
 	int retval;
 
 	audit_ptrace(task);
