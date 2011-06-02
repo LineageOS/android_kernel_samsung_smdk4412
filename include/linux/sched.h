@@ -1861,7 +1861,10 @@ extern int task_free_unregister(struct notifier_block *n);
 #define JOBCTL_STOP_CONSUME	(1 << JOBCTL_STOP_CONSUME_BIT)
 #define JOBCTL_TRAPPING		(1 << JOBCTL_TRAPPING_BIT)
 
-extern void task_clear_jobctl_stop_pending(struct task_struct *task);
+#define JOBCTL_PENDING_MASK	JOBCTL_STOP_PENDING
+
+extern void task_clear_jobctl_pending(struct task_struct *task,
+				      unsigned int mask);
 
 #ifdef CONFIG_PREEMPT_RCU
 
