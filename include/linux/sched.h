@@ -1863,6 +1863,8 @@ extern int task_free_unregister(struct notifier_block *n);
 
 #define JOBCTL_PENDING_MASK	JOBCTL_STOP_PENDING
 
+extern bool task_set_jobctl_pending(struct task_struct *task,
+				    unsigned int mask);
 extern void task_clear_jobctl_pending(struct task_struct *task,
 				      unsigned int mask);
 
