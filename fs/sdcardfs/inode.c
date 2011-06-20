@@ -668,7 +668,7 @@ static int sdcardfs_permission(struct inode *inode, int mask)
 	 * Permission check on sdcardfs inode.
 	 * Calling process should have AID_SDCARD_RW permission
 	 */
-	err = generic_permission(inode, mask, 0, inode->i_op->check_acl);
+	err = generic_permission(inode, mask, 0);
 
 	/* XXX
 	 * Original sdcardfs code calls inode_permission(lower_inode,.. )
