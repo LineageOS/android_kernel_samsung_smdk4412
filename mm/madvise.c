@@ -223,7 +223,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 			+ ((loff_t)vma->vm_pgoff << PAGE_SHIFT);
 
 	/*
-	 * vmtruncate_range may need to take i_mutex and i_alloc_sem.
+	 * vmtruncate_range may need to take i_mutex.
 	 * We need to explicitly grab a reference because the vma (and
 	 * hence the vma's reference to the file) can go away as soon as
 	 * we drop mmap_sem.
