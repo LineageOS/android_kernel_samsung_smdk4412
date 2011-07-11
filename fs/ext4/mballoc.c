@@ -2419,14 +2419,14 @@ static int ext4_groupinfo_create_slab(size_t size)
 					slab_size, 0, SLAB_RECLAIM_ACCOUNT,
 					NULL);
 
+	ext4_groupinfo_caches[cache_index] = cachep;
+
 	mutex_unlock(&ext4_grpinfo_slab_create_mutex);
 	if (!cachep) {
 		printk(KERN_EMERG
 		       "EXT4-fs: no memory for groupinfo slab cache\n");
 		return -ENOMEM;
 	}
-
-	ext4_groupinfo_caches[cache_index] = cachep;
 
 	return 0;
 }
