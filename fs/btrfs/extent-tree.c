@@ -3124,7 +3124,6 @@ commit_trans:
 		return -ENOSPC;
 	}
 	data_sinfo->bytes_may_use += bytes;
-	BTRFS_I(inode)->reserved_bytes += bytes;
 	spin_unlock(&data_sinfo->lock);
 
 	return 0;
@@ -3146,7 +3145,6 @@ void btrfs_free_reserved_data_space(struct inode *inode, u64 bytes)
 	data_sinfo = BTRFS_I(inode)->space_info;
 	spin_lock(&data_sinfo->lock);
 	data_sinfo->bytes_may_use -= bytes;
-	BTRFS_I(inode)->reserved_bytes -= bytes;
 	spin_unlock(&data_sinfo->lock);
 }
 
