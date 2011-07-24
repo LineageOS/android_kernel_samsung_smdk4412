@@ -3297,7 +3297,7 @@ void __init console_init(void)
 	}
 }
 
-static char *tty_devnode(struct device *dev, mode_t *mode)
+static char *tty_devnode(struct device *dev, umode_t *mode)
 {
 	if (!mode)
 		return NULL;
