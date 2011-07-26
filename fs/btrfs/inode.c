@@ -4758,7 +4758,7 @@ fail:
 	return err;
 }
 
-static int btrfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int btrfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode = NULL;
 	struct btrfs_trans_handle *trans;
