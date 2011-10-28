@@ -286,7 +286,7 @@ static int jfs_mkdir(struct inode *dip, struct dentry *dentry, umode_t mode)
 		goto out3;
 	}
 
-	ip->i_nlink = 2;	/* for '.' */
+	set_nlink(ip, 2);	/* for '.' */
 	ip->i_op = &jfs_dir_inode_operations;
 	ip->i_fop = &jfs_dir_operations;
 
