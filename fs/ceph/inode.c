@@ -771,9 +771,9 @@ no_change:
 	    ceph_snap(inode) == CEPH_NOSNAP &&
 	    (le32_to_cpu(info->cap.caps) & CEPH_CAP_FILE_SHARED) &&
 	    (issued & CEPH_CAP_FILE_EXCL) == 0 &&
-	    (ci->i_ceph_flags & CEPH_I_COMPLETE) == 0) {
+	    !ceph_dir_test_complete(inode)) {
 		dout(" marking %p complete (empty)\n", inode);
-		/* ci->i_ceph_flags |= CEPH_I_COMPLETE; */
+		ceph_dir_set_complete(inode);
 		ci->i_max_offset = 2;
 	}
 
