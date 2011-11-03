@@ -850,7 +850,7 @@ static void ceph_set_dentry_offset(struct dentry *dn)
 	di = ceph_dentry(dn);
 
 	spin_lock(&inode->i_lock);
-	if ((ceph_inode(inode)->i_ceph_flags & CEPH_I_COMPLETE) == 0) {
+	if (!ceph_dir_test_complete(inode)) {
 		spin_unlock(&inode->i_lock);
 		return;
 	}
@@ -1052,7 +1052,7 @@ int ceph_fill_trace(struct super_block *sb, struct ceph_mds_request *req,
 			 * d_move() puts the renamed dentry at the end of
 			 * d_subdirs.  We need to assign it an appropriate
 			 * directory offset so we can behave when holding
-			 * I_COMPLETE.
+			 * D_COMPLETE.
 			 */
 			ceph_set_dentry_offset(req->r_old_dentry);
 			dout("dn %p gets new offset %lld\n", req->r_old_dentry, 
