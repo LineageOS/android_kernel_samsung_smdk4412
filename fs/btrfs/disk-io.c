@@ -1774,9 +1774,9 @@ static void free_root_pointers(struct btrfs_fs_info *info, int chunk_root)
 }
 
 
-struct btrfs_root *open_ctree(struct super_block *sb,
-			      struct btrfs_fs_devices *fs_devices,
-			      char *options)
+int open_ctree(struct super_block *sb,
+	       struct btrfs_fs_devices *fs_devices,
+	       char *options)
 {
 	u32 sectorsize;
 	u32 nodesize;
@@ -2300,11 +2300,11 @@ retry_root_backup:
 		if (err) {
 			close_ctree(tree_root);
 			free_fs_info(fs_info);
-			return ERR_PTR(err);
+			return err;
 		}
 	}
 
-	return tree_root;
+	return 0;
 
 fail_trans_kthread:
 	kthread_stop(fs_info->transaction_kthread);
@@ -2349,7 +2349,7 @@ fail_srcu:
 fail:
 	btrfs_close_devices(fs_info->fs_devices);
 	free_fs_info(fs_info);
-	return ERR_PTR(err);
+	return err;
 
 recovery_tree_root:
 	if (!btrfs_test_opt(tree_root, RECOVERY))
