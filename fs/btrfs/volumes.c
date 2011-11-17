@@ -684,8 +684,6 @@ int btrfs_scan_one_device(const char *path, fmode_t flags, void *holder,
 	u64 devid;
 	u64 transid;
 
-	mutex_lock(&uuid_mutex);
-
 	flags |= FMODE_EXCL;
 	bdev = blkdev_get_by_path(path, flags, holder);
 
@@ -694,6 +692,7 @@ int btrfs_scan_one_device(const char *path, fmode_t flags, void *holder,
 		goto error;
 	}
 
+	mutex_lock(&uuid_mutex);
 	ret = set_blocksize(bdev, 4096);
 	if (ret)
 		goto error_close;
@@ -715,9 +714,9 @@ int btrfs_scan_one_device(const char *path, fmode_t flags, void *holder,
 
 	brelse(bh);
 error_close:
+	mutex_unlock(&uuid_mutex);
 	blkdev_put(bdev, flags);
 error:
-	mutex_unlock(&uuid_mutex);
 	return ret;
 }
 
