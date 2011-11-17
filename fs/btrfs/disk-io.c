@@ -2294,6 +2294,7 @@ retry_root_backup:
 		up_read(&fs_info->cleanup_work_sem);
 		if (err) {
 			close_ctree(tree_root);
+			free_fs_info(fs_info);
 			return ERR_PTR(err);
 		}
 	}
@@ -2814,8 +2815,6 @@ int close_ctree(struct btrfs_root *root)
 
 	bdi_destroy(&fs_info->bdi);
 	cleanup_srcu_struct(&fs_info->subvol_srcu);
-
-	free_fs_info(fs_info);
 
 	return 0;
 }
