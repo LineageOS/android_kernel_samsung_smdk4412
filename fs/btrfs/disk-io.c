@@ -2299,7 +2299,6 @@ retry_root_backup:
 		up_read(&fs_info->cleanup_work_sem);
 		if (err) {
 			close_ctree(tree_root);
-			free_fs_info(fs_info);
 			return err;
 		}
 	}
@@ -2348,7 +2347,6 @@ fail_srcu:
 	cleanup_srcu_struct(&fs_info->subvol_srcu);
 fail:
 	btrfs_close_devices(fs_info->fs_devices);
-	free_fs_info(fs_info);
 	return err;
 
 recovery_tree_root:
