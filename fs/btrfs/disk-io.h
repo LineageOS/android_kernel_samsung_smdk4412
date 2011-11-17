@@ -86,8 +86,6 @@ int btrfs_add_log_tree(struct btrfs_trans_handle *trans,
 int btree_lock_page_hook(struct page *page);
 
 
-struct btrfs_root *btrfs_alloc_root(struct btrfs_fs_info *fs_info);
-
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 void btrfs_set_buffer_lockdep_class(struct extent_buffer *eb, int level);
 #else
