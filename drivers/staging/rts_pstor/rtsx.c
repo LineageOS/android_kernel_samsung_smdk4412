@@ -472,8 +472,6 @@ static int rtsx_control_thread(void *__dev)
 	struct rtsx_chip *chip = dev->chip;
 	struct Scsi_Host *host = rtsx_to_host(dev);
 
-	current->flags |= PF_NOFREEZE;
-
 	for (;;) {
 		if (down_interruptible(&dev->sema))
 			break;
