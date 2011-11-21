@@ -1289,7 +1289,7 @@ compat_sys_vmsplice(int fd, const struct compat_iovec __user *iov32,
  * O_LARGEFILE flag.
  */
 asmlinkage long
-compat_sys_open(const char __user *filename, int flags, int mode)
+compat_sys_open(const char __user *filename, int flags, umode_t mode)
 {
 	return do_sys_open(AT_FDCWD, filename, flags, mode);
 }
@@ -1299,7 +1299,7 @@ compat_sys_open(const char __user *filename, int flags, int mode)
  * O_LARGEFILE flag.
  */
 asmlinkage long
-compat_sys_openat(unsigned int dfd, const char __user *filename, int flags, int mode)
+compat_sys_openat(unsigned int dfd, const char __user *filename, int flags, umode_t mode)
 {
 	return do_sys_open(dfd, filename, flags, mode);
 }
