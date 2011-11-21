@@ -100,7 +100,6 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
 #define TIF_RESTORE_SIGMASK	19	/* restore signal mask in do_signal() */
 #define TIF_SINGLE_STEP		20	/* This task is single stepped */
-#define TIF_FREEZE		21	/* thread is freezing for suspend */
 
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
 #define _TIF_RESTORE_SIGMASK	(1<<TIF_RESTORE_SIGMASK)
@@ -115,8 +114,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_SYSCALL_TRACEPOINT	(1<<TIF_SYSCALL_TRACEPOINT)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 #define _TIF_31BIT		(1<<TIF_31BIT)
-#define _TIF_SINGLE_STEP	(1<<TIF_FREEZE)
-#define _TIF_FREEZE		(1<<TIF_FREEZE)
+#define _TIF_SINGLE_STEP	(1<<TIF_SINGLE_STEP)
 
 #ifdef CONFIG_64BIT
 #define is_32bit_task()		(test_thread_flag(TIF_31BIT))
