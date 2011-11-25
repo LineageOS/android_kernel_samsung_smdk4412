@@ -2560,21 +2560,21 @@ out_type:
  *
  * namespace_sem or vfsmount_lock is held
  */
-bool is_path_reachable(struct vfsmount *mnt, struct dentry *dentry,
+bool is_path_reachable(struct mount *mnt, struct dentry *dentry,
 			 const struct path *root)
 {
-	while (mnt != root->mnt && mnt_has_parent(real_mount(mnt))) {
-		dentry = mnt->mnt_mountpoint;
-		mnt = mnt->mnt_parent;
+	while (&mnt->mnt != root->mnt && mnt_has_parent(mnt)) {
+		dentry = mnt->mnt.mnt_mountpoint;
+		mnt = real_mount(mnt->mnt.mnt_parent);
 	}
-	return mnt == root->mnt && is_subdir(dentry, root->dentry);
+	return &mnt->mnt == root->mnt && is_subdir(dentry, root->dentry);
 }
 
 int path_is_under(struct path *path1, struct path *path2)
 {
 	int res;
 	br_read_lock(vfsmount_lock);
-	res = is_path_reachable(path1->mnt, path1->dentry, path2);
+	res = is_path_reachable(real_mount(path1->mnt), path1->dentry, path2);
 	br_read_unlock(vfsmount_lock);
 	return res;
 }
@@ -2660,7 +2660,7 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	if (!mnt_has_parent(new_mnt))
 		goto out4; /* not attached */
 	/* make sure we can reach put_old from new_root */
-	if (!is_path_reachable(old.mnt, old.dentry, &new))
+	if (!is_path_reachable(real_mount(old.mnt), old.dentry, &new))
 		goto out4;
 	/* make certain new is below the root */
 	if (!is_path_reachable(new.mnt, new.dentry, &root))
