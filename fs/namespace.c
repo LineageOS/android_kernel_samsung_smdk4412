@@ -521,7 +521,7 @@ static void __touch_mnt_namespace(struct mnt_namespace *ns)
  * Clear dentry's mounted state if it has no remaining mounts.
  * vfsmount_lock must be held for write.
  */
-static void dentry_reset_mounted(struct vfsmount *mnt, struct dentry *dentry)
+static void dentry_reset_mounted(struct dentry *dentry)
 {
 	unsigned u;
 
@@ -549,7 +549,7 @@ static void detach_mnt(struct vfsmount *mnt, struct path *old_path)
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	list_del_init(&mnt->mnt_child);
 	list_del_init(&mnt->mnt_hash);
-	dentry_reset_mounted(old_path->mnt, old_path->dentry);
+	dentry_reset_mounted(old_path->dentry);
 }
 
 /*
@@ -1225,7 +1225,7 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
 		p->mnt_ns = NULL;
 		if (mnt_has_parent(p)) {
 			p->mnt_parent->mnt_ghosts++;
-			dentry_reset_mounted(p->mnt_parent, p->mnt_mountpoint);
+			dentry_reset_mounted(p->mnt_mountpoint);
 		}
 		change_mnt_propagation(p, MS_PRIVATE);
 	}
