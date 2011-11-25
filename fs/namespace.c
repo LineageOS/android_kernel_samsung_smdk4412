@@ -474,7 +474,7 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry,
 		if (tmp == head)
 			break;
 		p = list_entry(tmp, struct mount, mnt_hash);
-		if (p->mnt.mnt_parent == mnt && p->mnt.mnt_mountpoint == dentry) {
+		if (p->mnt_parent == mnt && p->mnt.mnt_mountpoint == dentry) {
 			found = p;
 			break;
 		}
@@ -556,8 +556,8 @@ static void dentry_reset_mounted(struct dentry *dentry)
 static void detach_mnt(struct mount *mnt, struct path *old_path)
 {
 	old_path->dentry = mnt->mnt.mnt_mountpoint;
-	old_path->mnt = mnt->mnt.mnt_parent;
-	mnt->mnt.mnt_parent = &mnt->mnt;
+	old_path->mnt = mnt->mnt_parent;
+	mnt->mnt_parent = &mnt->mnt;
 	mnt->mnt.mnt_mountpoint = mnt->mnt.mnt_root;
 	list_del_init(&mnt->mnt.mnt_child);
 	list_del_init(&mnt->mnt_hash);
@@ -570,7 +570,7 @@ static void detach_mnt(struct mount *mnt, struct path *old_path)
 void mnt_set_mountpoint(struct vfsmount *mnt, struct dentry *dentry,
 			struct mount *child_mnt)
 {
-	child_mnt->mnt.mnt_parent = mntget(mnt);
+	child_mnt->mnt_parent = mntget(mnt);
 	child_mnt->mnt.mnt_mountpoint = dget(dentry);
 	spin_lock(&dentry->d_lock);
 	dentry->d_flags |= DCACHE_MOUNTED;
@@ -608,7 +608,7 @@ static inline void __mnt_make_shortterm(struct vfsmount *mnt)
  */
 static void commit_tree(struct mount *mnt)
 {
-	struct vfsmount *parent = mnt->mnt.mnt_parent;
+	struct vfsmount *parent = mnt->mnt_parent;
 	struct vfsmount *m;
 	LIST_HEAD(head);
 	struct mnt_namespace *n = parent->mnt_ns;
@@ -637,9 +637,9 @@ static struct mount *next_mnt(struct mount *p, struct vfsmount *root)
 			if (&p->mnt == root)
 				return NULL;
 			next = p->mnt.mnt_child.next;
-			if (next != &p->mnt.mnt_parent->mnt_mounts)
+			if (next != &p->mnt_parent->mnt_mounts)
 				break;
-			p = real_mount(p->mnt.mnt_parent);
+			p = real_mount(p->mnt_parent);
 		}
 	}
 	return list_entry(next, struct mount, mnt.mnt_child);
@@ -680,7 +680,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	mnt->mnt.mnt_root = root;
 	mnt->mnt.mnt_sb = root->d_sb;
 	mnt->mnt.mnt_mountpoint = mnt->mnt.mnt_root;
-	mnt->mnt.mnt_parent = &mnt->mnt;
+	mnt->mnt_parent = &mnt->mnt;
 	return &mnt->mnt;
 }
 EXPORT_SYMBOL_GPL(vfs_kern_mount);
@@ -708,7 +708,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 		mnt->mnt.mnt_sb = sb;
 		mnt->mnt.mnt_root = dget(root);
 		mnt->mnt.mnt_mountpoint = mnt->mnt.mnt_root;
-		mnt->mnt.mnt_parent = &mnt->mnt;
+		mnt->mnt_parent = &mnt->mnt;
 
 		if (flag & CL_SLAVE) {
 			list_add(&mnt->mnt.mnt_slave, &old->mnt.mnt_slave_list);
@@ -1019,12 +1019,13 @@ static int show_mountinfo(struct seq_file *m, void *v)
 {
 	struct proc_mounts *p = m->private;
 	struct vfsmount *mnt = list_entry(v, struct vfsmount, mnt_list);
+	struct mount *r = real_mount(mnt);
 	struct super_block *sb = mnt->mnt_sb;
 	struct path mnt_path = { .dentry = mnt->mnt_root, .mnt = mnt };
 	struct path root = p->root;
 	int err = 0;
 
-	seq_printf(m, "%i %i %u:%u ", mnt->mnt_id, mnt->mnt_parent->mnt_id,
+	seq_printf(m, "%i %i %u:%u ", mnt->mnt_id, r->mnt_parent->mnt_id,
 		   MAJOR(sb->s_dev), MINOR(sb->s_dev));
 	if (sb->s_op->show_path)
 		err = sb->s_op->show_path(m, mnt);
@@ -1199,9 +1200,9 @@ void release_mounts(struct list_head *head)
 
 			br_write_lock(vfsmount_lock);
 			dentry = mnt->mnt.mnt_mountpoint;
-			m = mnt->mnt.mnt_parent;
+			m = mnt->mnt_parent;
 			mnt->mnt.mnt_mountpoint = mnt->mnt.mnt_root;
-			mnt->mnt.mnt_parent = &mnt->mnt;
+			mnt->mnt_parent = &mnt->mnt;
 			m->mnt_ghosts--;
 			br_write_unlock(vfsmount_lock);
 			dput(dentry);
@@ -1237,7 +1238,7 @@ void umount_tree(struct mount *mnt, int propagate, struct list_head *kill)
 		__mnt_make_shortterm(&p->mnt);
 		list_del_init(&p->mnt.mnt_child);
 		if (mnt_has_parent(p)) {
-			p->mnt.mnt_parent->mnt_ghosts++;
+			p->mnt_parent->mnt_ghosts++;
 			dentry_reset_mounted(p->mnt.mnt_mountpoint);
 		}
 		change_mnt_propagation(p, MS_PRIVATE);
@@ -1435,9 +1436,9 @@ struct mount *copy_tree(struct mount *mnt, struct dentry *dentry,
 				s = skip_mnt_tree(s);
 				continue;
 			}
-			while (p != real_mount(s->mnt.mnt_parent)) {
-				p = real_mount(p->mnt.mnt_parent);
-				q = real_mount(q->mnt.mnt_parent);
+			while (p != real_mount(s->mnt_parent)) {
+				p = real_mount(p->mnt_parent);
+				q = real_mount(q->mnt_parent);
 			}
 			p = s;
 			path.mnt = &q->mnt;
@@ -1899,7 +1900,7 @@ static int do_move_mount(struct path *path, char *old_name)
 	/*
 	 * Don't move a mount residing in a shared parent.
 	 */
-	if (IS_MNT_SHARED(old_path.mnt->mnt_parent))
+	if (IS_MNT_SHARED(old->mnt_parent))
 		goto out1;
 	/*
 	 * Don't move a mount tree containing unbindable mounts to a destination
@@ -1909,7 +1910,7 @@ static int do_move_mount(struct path *path, char *old_name)
 	    tree_contains_unbindable(old))
 		goto out1;
 	err = -ELOOP;
-	for (p = real_mount(path->mnt); mnt_has_parent(p); p = real_mount(p->mnt.mnt_parent))
+	for (p = real_mount(path->mnt); mnt_has_parent(p); p = real_mount(p->mnt_parent))
 		if (p == old)
 			goto out1;
 
@@ -2159,7 +2160,7 @@ resume:
 	 */
 	if (this_parent != parent) {
 		next = this_parent->mnt.mnt_child.next;
-		this_parent = real_mount(this_parent->mnt.mnt_parent);
+		this_parent = real_mount(this_parent->mnt_parent);
 		goto resume;
 	}
 	return found;
@@ -2565,7 +2566,7 @@ bool is_path_reachable(struct mount *mnt, struct dentry *dentry,
 {
 	while (&mnt->mnt != root->mnt && mnt_has_parent(mnt)) {
 		dentry = mnt->mnt.mnt_mountpoint;
-		mnt = real_mount(mnt->mnt.mnt_parent);
+		mnt = real_mount(mnt->mnt_parent);
 	}
 	return &mnt->mnt == root->mnt && is_subdir(dentry, root->dentry);
 }
@@ -2636,8 +2637,8 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	new_mnt = real_mount(new.mnt);
 	root_mnt = real_mount(root.mnt);
 	if (IS_MNT_SHARED(old.mnt) ||
-		IS_MNT_SHARED(new.mnt->mnt_parent) ||
-		IS_MNT_SHARED(root.mnt->mnt_parent))
+		IS_MNT_SHARED(new_mnt->mnt_parent) ||
+		IS_MNT_SHARED(root_mnt->mnt_parent))
 		goto out4;
 	if (!check_mnt(root.mnt) || !check_mnt(new.mnt))
 		goto out4;
