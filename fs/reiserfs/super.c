@@ -2089,7 +2089,7 @@ static int reiserfs_quota_on(struct super_block *sb, int type, int format_id,
 	}
 
 	/* Quotafile not on the same filesystem? */
-	if (path->mnt->mnt_sb != sb) {
+	if (path->dentry->d_sb != sb) {
 		err = -EXDEV;
 		goto out;
 	}
