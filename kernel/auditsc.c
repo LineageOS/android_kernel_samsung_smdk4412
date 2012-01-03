@@ -1833,9 +1833,6 @@ void __audit_getname(const char *name)
 {
 	struct audit_context *context = current->audit_context;
 
-	if (IS_ERR(name) || !name)
-		return;
-
 	if (!context->in_syscall) {
 #if AUDIT_DEBUG == 2
 		printk(KERN_ERR "%s:%d(:%d): ignoring getname(%p)\n",
