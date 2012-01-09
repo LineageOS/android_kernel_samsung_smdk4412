@@ -268,7 +268,7 @@ int pstore_fill_super(struct super_block *sb, void *data, int silent)
 	/* override ramfs "dir" options so we catch unlink(2) */
 	inode->i_op = &pstore_dir_inode_operations;
 
-	root = d_alloc_root(inode);
+	root = d_make_root(inode);
 	sb->s_root = root;
 	if (!root) {
 		err = -ENOMEM;
@@ -279,7 +279,6 @@ int pstore_fill_super(struct super_block *sb, void *data, int silent)
 
 	return 0;
 fail:
-	iput(inode);
 	return err;
 }
 
