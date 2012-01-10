@@ -71,7 +71,7 @@ static inline void inet_diag_unlock_handler(
 }
 
 int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
-			      struct sk_buff *skb, struct inet_diag_req *req,
+			      struct sk_buff *skb, struct inet_diag_req_v2 *req,
 			      u32 pid, u32 seq, u16 nlmsg_flags,
 			      const struct nlmsghdr *unlh)
 {
@@ -192,7 +192,7 @@ nlmsg_failure:
 EXPORT_SYMBOL_GPL(inet_sk_diag_fill);
 
 static int inet_csk_diag_fill(struct sock *sk,
-			      struct sk_buff *skb, struct inet_diag_req *req,
+			      struct sk_buff *skb, struct inet_diag_req_v2 *req,
 			      u32 pid, u32 seq, u16 nlmsg_flags,
 			      const struct nlmsghdr *unlh)
 {
@@ -201,7 +201,7 @@ static int inet_csk_diag_fill(struct sock *sk,
 }
 
 static int inet_twsk_diag_fill(struct inet_timewait_sock *tw,
-			       struct sk_buff *skb, struct inet_diag_req *req,
+			       struct sk_buff *skb, struct inet_diag_req_v2 *req,
 			       u32 pid, u32 seq, u16 nlmsg_flags,
 			       const struct nlmsghdr *unlh)
 {
@@ -254,7 +254,7 @@ nlmsg_failure:
 }
 
 static int sk_diag_fill(struct sock *sk, struct sk_buff *skb,
-			struct inet_diag_req *r, u32 pid, u32 seq, u16 nlmsg_flags,
+			struct inet_diag_req_v2 *r, u32 pid, u32 seq, u16 nlmsg_flags,
 			const struct nlmsghdr *unlh)
 {
 	if (sk->sk_state == TCP_TIME_WAIT)
@@ -265,7 +265,7 @@ static int sk_diag_fill(struct sock *sk, struct sk_buff *skb,
 }
 
 int inet_diag_dump_one_icsk(struct inet_hashinfo *hashinfo, struct sk_buff *in_skb,
-		const struct nlmsghdr *nlh, struct inet_diag_req *req)
+		const struct nlmsghdr *nlh, struct inet_diag_req_v2 *req)
 {
 	int err;
 	struct sock *sk;
@@ -334,7 +334,7 @@ EXPORT_SYMBOL_GPL(inet_diag_dump_one_icsk);
 
 static int inet_diag_get_exact(struct sk_buff *in_skb,
 			       const struct nlmsghdr *nlh,
-			       struct inet_diag_req *req)
+			       struct inet_diag_req_v2 *req)
 {
 	const struct inet_diag_handler *handler;
 	int err;
@@ -541,7 +541,7 @@ static int inet_diag_bc_audit(const void *bytecode, int bytecode_len)
 static int inet_csk_diag_dump(struct sock *sk,
 			      struct sk_buff *skb,
 			      struct netlink_callback *cb,
-			      struct inet_diag_req *r,
+			      struct inet_diag_req_v2 *r,
 			      const struct nlattr *bc)
 {
 	if (!inet_diag_bc_sk(bc, sk))
@@ -555,7 +555,7 @@ static int inet_csk_diag_dump(struct sock *sk,
 static int inet_twsk_diag_dump(struct inet_timewait_sock *tw,
 			       struct sk_buff *skb,
 			       struct netlink_callback *cb,
-			       struct inet_diag_req *r,
+			       struct inet_diag_req_v2 *r,
 			       const struct nlattr *bc)
 {
 	if (bc != NULL) {
@@ -642,7 +642,7 @@ nlmsg_failure:
 
 static int inet_diag_dump_reqs(struct sk_buff *skb, struct sock *sk,
 			       struct netlink_callback *cb,
-			       struct inet_diag_req *r,
+			       struct inet_diag_req_v2 *r,
 			       const struct nlattr *bc)
 {
 	struct inet_diag_entry entry;
@@ -724,7 +724,7 @@ out:
 }
 
 void inet_diag_dump_icsk(struct inet_hashinfo *hashinfo, struct sk_buff *skb,
-		struct netlink_callback *cb, struct inet_diag_req *r, struct nlattr *bc)
+		struct netlink_callback *cb, struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	int i, num;
 	int s_i, s_num;
@@ -875,7 +875,7 @@ out:
 EXPORT_SYMBOL_GPL(inet_diag_dump_icsk);
 
 static int __inet_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req *r, struct nlattr *bc)
+		struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	const struct inet_diag_handler *handler;
 
@@ -890,12 +890,12 @@ static int __inet_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
 static int inet_diag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct nlattr *bc = NULL;
-	int hdrlen = sizeof(struct inet_diag_req);
+	int hdrlen = sizeof(struct inet_diag_req_v2);
 
 	if (nlmsg_attrlen(cb->nlh, hdrlen))
 		bc = nlmsg_find_attr(cb->nlh, hdrlen, INET_DIAG_REQ_BYTECODE);
 
-	return __inet_diag_dump(skb, cb, (struct inet_diag_req *)NLMSG_DATA(cb->nlh), bc);
+	return __inet_diag_dump(skb, cb, (struct inet_diag_req_v2 *)NLMSG_DATA(cb->nlh), bc);
 }
 
 static inline int inet_diag_type2proto(int type)
@@ -913,7 +913,7 @@ static inline int inet_diag_type2proto(int type)
 static int inet_diag_dump_compat(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct inet_diag_req_compat *rc = NLMSG_DATA(cb->nlh);
-	struct inet_diag_req req;
+	struct inet_diag_req_v2 req;
 	struct nlattr *bc = NULL;
 	int hdrlen = sizeof(struct inet_diag_req_compat);
 
@@ -933,7 +933,7 @@ static int inet_diag_get_exact_compat(struct sk_buff *in_skb,
 			       const struct nlmsghdr *nlh)
 {
 	struct inet_diag_req_compat *rc = NLMSG_DATA(nlh);
-	struct inet_diag_req req;
+	struct inet_diag_req_v2 req;
 
 	req.sdiag_family = rc->idiag_family;
 	req.sdiag_protocol = inet_diag_type2proto(nlh->nlmsg_type);
@@ -973,7 +973,7 @@ static int inet_diag_rcv_msg_compat(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 static int inet_diag_handler_dump(struct sk_buff *skb, struct nlmsghdr *h)
 {
-	int hdrlen = sizeof(struct inet_diag_req);
+	int hdrlen = sizeof(struct inet_diag_req_v2);
 
 	if (nlmsg_len(h) < hdrlen)
 		return -EINVAL;
@@ -993,7 +993,7 @@ static int inet_diag_handler_dump(struct sk_buff *skb, struct nlmsghdr *h)
 					  inet_diag_dump, NULL, 0);
 	}
 
-	return inet_diag_get_exact(skb, h, (struct inet_diag_req *)NLMSG_DATA(h));
+	return inet_diag_get_exact(skb, h, (struct inet_diag_req_v2 *)NLMSG_DATA(h));
 }
 
 static struct sock_diag_handler inet_diag_handler = {
