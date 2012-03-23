@@ -1014,6 +1014,8 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	RB_CLEAR_NODE(&sig->adj_node);
 #endif
+	sig->has_child_subreaper = current->signal->has_child_subreaper ||
+				   current->signal->is_child_subreaper;
 
 	mutex_init(&sig->cred_guard_mutex);
 
