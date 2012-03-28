@@ -251,13 +251,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 		sys_sync();
 		printk("done.\n");
 
-		error = usermodehelper_disable();
-		if (error)
-			break;
-
 		error = freeze_processes();
-		if (error)
-			usermodehelper_enable();
 		if (!error)
 			data->frozen = 1;
 		break;
@@ -267,7 +261,6 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			break;
 		pm_restore_gfp_mask();
 		thaw_processes();
-		usermodehelper_enable();
 		data->frozen = 0;
 		break;
 
