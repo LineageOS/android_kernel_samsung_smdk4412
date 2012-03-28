@@ -40,7 +40,6 @@
 #include <asm/fpu.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/system.h>
 #include <asm/sysinfo.h>
 #include <asm/hwrpb.h>
 #include <asm/processor.h>
