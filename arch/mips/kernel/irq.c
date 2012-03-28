@@ -24,7 +24,6 @@
 #include <linux/ftrace.h>
 
 #include <asm/atomic.h>
-#include <asm/system.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_KGDB

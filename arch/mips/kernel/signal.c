@@ -33,6 +33,7 @@
 #include <asm/cpu-features.h>
 #include <asm/war.h>
 #include <asm/vdso.h>
+#include <asm/dsp.h>
 
 #include "signal-common.h"
 
