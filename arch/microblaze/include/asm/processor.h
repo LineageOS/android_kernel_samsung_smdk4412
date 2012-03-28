@@ -147,6 +147,8 @@ static inline void exit_thread(void)
 
 unsigned long get_wchan(struct task_struct *p);
 
+extern void ret_from_fork(void);
+
 /* The size allocated for kernel stacks. This _must_ be a power of two! */
 # define KERNEL_STACK_SIZE	0x2000
 
@@ -168,6 +170,14 @@ unsigned long get_wchan(struct task_struct *p);
 
 #  define STACK_TOP	TASK_SIZE
 #  define STACK_TOP_MAX	STACK_TOP
+
+void disable_hlt(void);
+void enable_hlt(void);
+void default_idle(void);
+
+#ifdef CONFIG_DEBUG_FS
+extern struct dentry *of_debugfs_root;
+#endif
 
 #  endif /* __ASSEMBLY__ */
 # endif /* CONFIG_MMU */
