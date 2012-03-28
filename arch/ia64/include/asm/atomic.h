@@ -15,7 +15,6 @@
 #include <linux/types.h>
 
 #include <asm/intrinsics.h>
-#include <asm/system.h>
 
 
 #define ATOMIC_INIT(i)		{ (i) }
