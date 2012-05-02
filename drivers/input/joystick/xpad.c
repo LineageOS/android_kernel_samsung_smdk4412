@@ -458,6 +458,7 @@ static void xpad360w_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned cha
 static void xpad_irq_in(struct urb *urb)
 {
 	struct usb_xpad *xpad = urb->context;
+	struct device *dev = &xpad->dev->dev;
 	int retval, status;
 
 	status = urb->status;
@@ -470,11 +471,11 @@ static void xpad_irq_in(struct urb *urb)
 	case -ENOENT:
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
-		dbg("%s - urb shutting down with status: %d",
+		dev_dbg(dev, "%s - urb shutting down with status: %d\n",
 			__func__, status);
 		return;
 	default:
-		dbg("%s - nonzero urb status received: %d",
+		dev_dbg(dev, "%s - nonzero urb status received: %d\n",
 			__func__, status);
 		goto exit;
 	}
@@ -493,13 +494,15 @@ static void xpad_irq_in(struct urb *urb)
 exit:
 	retval = usb_submit_urb(urb, GFP_ATOMIC);
 	if (retval)
-		dev_err(&xpad->dev->dev,
-			"%s - usb_submit_urb failed with result %d\n",
+		dev_err(dev, "%s - usb_submit_urb failed with result %d\n",
 			__func__, retval);
 }
 
 static void xpad_bulk_out(struct urb *urb)
 {
+	struct usb_xpad *xpad = urb->context;
+	struct device *dev = &xpad->dev->dev;
+
 	switch (urb->status) {
 	case 0:
 		/* success */
@@ -508,10 +511,12 @@ static void xpad_bulk_out(struct urb *urb)
 	case -ENOENT:
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
-		dbg("%s - urb shutting down with status: %d", __func__, urb->status);
+		dev_dbg(dev, "%s - urb shutting down with status: %d\n",
+			__func__, urb->status);
 		break;
 	default:
-		dbg("%s - nonzero urb status received: %d", __func__, urb->status);
+		dev_dbg(dev, "%s - nonzero urb status received: %d\n",
+			__func__, urb->status);
 	}
 }
 
@@ -519,6 +524,7 @@ static void xpad_bulk_out(struct urb *urb)
 static void xpad_irq_out(struct urb *urb)
 {
 	struct usb_xpad *xpad = urb->context;
+	struct device *dev = &xpad->dev->dev;
 	int retval, status;
 
 	status = urb->status;
@@ -532,19 +538,20 @@ static void xpad_irq_out(struct urb *urb)
 	case -ENOENT:
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
-		dbg("%s - urb shutting down with status: %d", __func__, status);
+		dev_dbg(dev, "%s - urb shutting down with status: %d\n",
+			__func__, status);
 		return;
 
 	default:
-		dbg("%s - nonzero urb status received: %d", __func__, status);
+		dev_dbg(dev, "%s - nonzero urb status received: %d\n",
+			__func__, status);
 		goto exit;
 	}
 
 exit:
 	retval = usb_submit_urb(urb, GFP_ATOMIC);
 	if (retval)
-		dev_err(&xpad->dev->dev,
-			"%s - usb_submit_urb failed with result %d\n",
+		dev_err(dev, "%s - usb_submit_urb failed with result %d\n",
 			__func__, retval);
 }
 
@@ -658,7 +665,8 @@ static int xpad_play_effect(struct input_dev *dev, void *data, struct ff_effect 
 			return usb_submit_urb(xpad->irq_out, GFP_ATOMIC);
 
 		default:
-			dbg("%s - rumble command sent to unsupported xpad type: %d",
+			dev_dbg(&xpad->dev->dev,
+				"%s - rumble command sent to unsupported xpad type: %d\n",
 				__func__, xpad->xtype);
 			return -1;
 		}
