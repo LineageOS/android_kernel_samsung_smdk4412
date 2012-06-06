@@ -540,11 +540,6 @@ power_attr(pm_trace_dev_match);
 
 #endif /* CONFIG_PM_TRACE */
 
-#ifdef CONFIG_USER_WAKELOCK
-power_attr(wake_lock);
-power_attr(wake_unlock);
-#endif
-
 #ifdef CONFIG_DVFS_LIMIT
 static int cpufreq_max_limit_val = -1;
 static int cpufreq_min_limit_val = -1;
@@ -919,10 +914,6 @@ static struct attribute *g[] = {
 	&touch_event_timer_attr.attr,
 #ifdef CONFIG_PM_DEBUG
 	&pm_test_attr.attr,
-#endif
-#ifdef CONFIG_USER_WAKELOCK
-	&wake_lock_attr.attr,
-	&wake_unlock_attr.attr,
 #endif
 #endif
 #ifdef CONFIG_DVFS_LIMIT
