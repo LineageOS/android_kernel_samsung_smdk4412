@@ -44,8 +44,8 @@ struct dst_entry {
 #else
 	void			*__pad1;
 #endif
-	int			(*input)(struct sk_buff*);
-	int			(*output)(struct sk_buff*);
+	int			(*input)(struct sk_buff *);
+	int			(*output)(struct sk_buff *);
 
 	short			error;
 	short			obsolete;
@@ -239,7 +239,7 @@ dst_metric_locked(const struct dst_entry *dst, int metric)
 	return dst_metric(dst, RTAX_LOCK) & (1<<metric);
 }
 
-static inline void dst_hold(struct dst_entry * dst)
+static inline void dst_hold(struct dst_entry *dst)
 {
 	/*
 	 * If your kernel compilation stops here, please check
@@ -262,8 +262,7 @@ static inline void dst_use_noref(struct dst_entry *dst, unsigned long time)
 	dst->lastuse = time;
 }
 
-static inline
-struct dst_entry * dst_clone(struct dst_entry * dst)
+static inline struct dst_entry *dst_clone(struct dst_entry *dst)
 {
 	if (dst)
 		atomic_inc(&dst->__refcnt);
@@ -362,12 +361,12 @@ static inline struct dst_entry *skb_dst_pop(struct sk_buff *skb)
 }
 
 extern int dst_discard(struct sk_buff *skb);
-extern void *dst_alloc(struct dst_ops * ops, struct net_device *dev,
+extern void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
 		       int initial_ref, int initial_obsolete, int flags);
-extern void __dst_free(struct dst_entry * dst);
-extern struct dst_entry *dst_destroy(struct dst_entry * dst);
+extern void __dst_free(struct dst_entry *dst);
+extern struct dst_entry *dst_destroy(struct dst_entry *dst);
 
-static inline void dst_free(struct dst_entry * dst)
+static inline void dst_free(struct dst_entry *dst)
 {
 	if (dst->obsolete > 1)
 		return;
