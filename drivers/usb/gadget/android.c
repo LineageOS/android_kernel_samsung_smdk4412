@@ -86,7 +86,7 @@ struct android_usb_function {
 	char *dev_name;
 	struct device_attribute **attributes;
 
-	/* for android_dev.enabled_functions */
+	/* for android_conf.enabled_functions */
 	struct list_head enabled_list;
 
 	struct android_dev *android_dev;
@@ -112,8 +112,8 @@ struct android_usb_function {
 };
 
 struct android_dev {
+	const char *name;
 	struct android_usb_function **functions;
-	struct list_head enabled_functions;
 	struct usb_composite_dev *cdev;
 	struct device *dev;
 
@@ -126,11 +126,24 @@ struct android_dev {
 	bool sw_connected;
 	struct work_struct work;
 
+	/* A list of struct android_configuration */
+	struct list_head configs;
+	int configs_num;
+
+	/* A list node inside the android_dev_list */
 	struct list_head list_item;
 
-	struct usb_configuration config;
-
 	char ffs_aliases[256];
+};
+
+struct android_configuration {
+	struct usb_configuration usb_config;
+
+	/* A list of the functions supported by this config */
+	struct list_head enabled_functions;
+
+	/* A list node inside the struct android_dev.configs list */
+	struct list_head list_item;
 };
 
 static struct class *android_class;
@@ -139,6 +152,10 @@ static int android_dev_count;
 static int android_bind_config(struct usb_configuration *c);
 static void android_unbind_config(struct usb_configuration *c);
 static struct android_dev *cdev_to_android_dev(struct usb_composite_dev *cdev);
+static struct android_configuration *alloc_android_config
+						(struct android_dev *dev);
+static void free_android_config(struct android_dev *dev,
+				struct android_configuration *conf);
 
 /* string IDs are assigned dynamically */
 #define STRING_MANUFACTURER_IDX		0
@@ -215,13 +232,17 @@ static void android_work(struct work_struct *data)
 static void android_enable(struct android_dev *dev)
 {
 	struct usb_composite_dev *cdev = dev->cdev;
+	struct android_configuration *conf;
 
 	BUG_ON(!mutex_is_locked(&dev->mutex));
 	BUG_ON(!dev->disable_depth);
 
 	if (--dev->disable_depth == 0) {
-		usb_add_config(cdev, &dev->config,
-					android_bind_config);
+
+		list_for_each_entry(conf, &dev->configs, list_item)
+			usb_add_config(cdev, &conf->usb_config,
+						android_bind_config);
+
 		usb_gadget_connect(cdev->gadget);
 	}
 }
@@ -229,6 +250,7 @@ static void android_enable(struct android_dev *dev)
 static void android_disable(struct android_dev *dev)
 {
 	struct usb_composite_dev *cdev = dev->cdev;
+	struct android_configuration *conf;
 
 	BUG_ON(!mutex_is_locked(&dev->mutex));
 
@@ -236,7 +258,9 @@ static void android_disable(struct android_dev *dev)
 		usb_gadget_disconnect(cdev->gadget);
 		/* Cancel pending control requests */
 		usb_ep_dequeue(cdev->gadget->ep0, cdev->req);
-		usb_remove_config(cdev, &dev->config);
+
+		list_for_each_entry(conf, &dev->configs, list_item)
+			usb_remove_config(cdev, &conf->usb_config);
 	}
 }
 
@@ -1149,9 +1173,11 @@ android_bind_enabled_functions(struct android_dev *dev,
 			       struct usb_configuration *c)
 {
 	struct android_usb_function *f;
+	struct android_configuration *conf =
+		container_of(c, struct android_configuration, usb_config);
 	int ret;
 
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
+	list_for_each_entry(f, &conf->enabled_functions, enabled_list) {
 		printk(KERN_DEBUG "usb: %s f:%s\n", __func__, f->name);
 		ret = f->bind_config(f, c);
 		if (ret) {
@@ -1167,14 +1193,18 @@ android_unbind_enabled_functions(struct android_dev *dev,
 			       struct usb_configuration *c)
 {
 	struct android_usb_function *f;
+	struct android_configuration *conf =
+		container_of(c, struct android_configuration, usb_config);
 
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
+	list_for_each_entry(f, &conf->enabled_functions, enabled_list) {
 		if (f->unbind_config)
 			f->unbind_config(f, c);
 	}
 }
 
-static int android_enable_function(struct android_dev *dev, char *name)
+static int android_enable_function(struct android_dev *dev,
+				   struct android_configuration *conf,
+				   char *name)
 {
 	struct android_usb_function **functions = dev->functions;
 	struct android_usb_function *f;
@@ -1182,11 +1212,12 @@ static int android_enable_function(struct android_dev *dev, char *name)
 	while ((f = *functions++)) {
 		if (!strcmp(name, f->name)) {
 			if (f->android_dev)
-				pr_err("%s cannot be enabled on two devices\n",
+				pr_err("%s already enabled in other " \
+					"configuration or device\n",
 					f->name);
 			else {
 				list_add_tail(&f->enabled_list,
-					      &dev->enabled_functions);
+					      &conf->enabled_functions);
 				f->android_dev = dev;
 				return 0;
 			}
@@ -1202,15 +1233,19 @@ static ssize_t
 functions_show(struct device *pdev, struct device_attribute *attr, char *buf)
 {
 	struct android_dev *dev = dev_get_drvdata(pdev);
+	struct android_configuration *conf;
 	struct android_usb_function *f;
 	char *buff = buf;
 
 	mutex_lock(&dev->mutex);
 
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
+	list_for_each_entry(conf, &dev->configs, list_item) {
 		printk(KERN_DEBUG "usb: %s enabled_func=%s\n",
-				__func__, f->name);
-		buff += sprintf(buff, "%s,", f->name);
+			__func__, f->name);
+		if (buff != buf)
+			*(buff-1) = ':';
+		list_for_each_entry(f, &conf->enabled_functions, enabled_list)
+			buff += snprintf(buff, PAGE_SIZE, "%s,", f->name);
 	}
 
 	mutex_unlock(&dev->mutex);
@@ -1227,6 +1262,9 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 {
 	struct android_dev *dev = dev_get_drvdata(pdev);
 	struct android_usb_function *f;
+	struct list_head *curr_conf = &dev->configs;
+	struct android_configuration *conf;
+	char *conf_str;
 	char *name;
 	char buf[256], *b;
 	char aliases[256], *a;
@@ -1242,47 +1280,70 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	}
 
 	/* Clear previous enabled list */
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
-		f->android_dev = NULL;
+	list_for_each_entry(conf, &dev->configs, list_item) {
+		list_for_each_entry(f, &conf->enabled_functions, enabled_list)
+			f->android_dev = NULL;
+		INIT_LIST_HEAD(&conf->enabled_functions);
 	}
-	INIT_LIST_HEAD(&dev->enabled_functions);
 
 	strlcpy(buf, buff, sizeof(buf));
 	b = strim(buf);
 
 	while (b) {
-		name = strsep(&b, ",");
-		if (!name)
-			continue;
-
-		is_ffs = 0;
-		strlcpy(aliases, dev->ffs_aliases, sizeof(aliases));
-		a = aliases;
-
-		while (a) {
-			char *alias = strsep(&a, ",");
-			if (alias && !strcmp(name, alias)) {
-				is_ffs = 1;
-				break;
-			}
-		}
-
-		if (is_ffs) {
-			if (ffs_enabled)
-				continue;
-			err = android_enable_function(dev, "ffs");
-			if (err)
-				pr_err("android_usb: Cannot enable ffs (%d)",
-									err);
+		conf_str = strsep(&b, ":");
+		if (conf_str) {
+			/* If the next not equal to the head, take it */
+			if (curr_conf->next != &dev->configs)
+				conf = list_entry(curr_conf->next,
+						  struct android_configuration,
+						  list_item);
 			else
-				ffs_enabled = 1;
-			continue;
+				conf = alloc_android_config(dev);
+
+			curr_conf = curr_conf->next;
 		}
 
-		err = android_enable_function(dev, name);
-		if (err)
-			pr_err("android_usb: Cannot enable '%s' (%d)",
-							   name, err);
+		while (conf_str) {
+			name = strsep(&conf_str, ",");
+			if (!name)
+				continue;
+
+			is_ffs = 0;
+			strlcpy(aliases, dev->ffs_aliases, sizeof(aliases));
+			a = aliases;
+
+			while (a) {
+				char *alias = strsep(&a, ",");
+				if (alias && !strcmp(name, alias)) {
+					is_ffs = 1;
+					break;
+				}
+			}
+
+			if (is_ffs) {
+				if (ffs_enabled)
+					continue;
+				err = android_enable_function(dev, conf, "ffs");
+				if (err)
+					pr_err("android_usb: Cannot enable ffs (%d)",
+									err);
+				else
+					ffs_enabled = 1;
+				continue;
+			}
+
+			err = android_enable_function(dev, conf, name);
+			if (err)
+				pr_err("android_usb: Cannot enable '%s' (%d)",
+								   name, err);
+		}
+	}
+
+	/* Free uneeded configurations if exists */
+	while (curr_conf->next != &dev->configs) {
+		conf = list_entry(curr_conf->next,
+				  struct android_configuration, list_item);
+		free_android_config(dev, conf);
 	}
 
 	mutex_unlock(&dev->mutex);
@@ -1304,6 +1365,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	struct android_dev *dev = dev_get_drvdata(pdev);
 	struct usb_composite_dev *cdev = dev->cdev;
 	struct android_usb_function *f;
+	struct android_configuration *conf;
 	int enabled = 0;
 
 	mutex_lock(&dev->mutex);
@@ -1329,18 +1391,22 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 				cdev->desc.bDeviceProtocol);
 		printk(KERN_DEBUG "usb: %s next cmd : usb_add_config\n",
 				__func__);
-		list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
-			if (f->enable)
-				f->enable(f);
-		}
+		list_for_each_entry(conf, &dev->configs, list_item)
+			list_for_each_entry(f, &conf->enabled_functions,
+						enabled_list) {
+				if (f->enable)
+					f->enable(f);
+			}
 		android_enable(dev);
 		dev->enabled = true;
 	} else if (!enabled && dev->enabled) {
 		android_disable(dev);
-		list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
-			if (f->disable)
-				f->disable(f);
-		}
+		list_for_each_entry(conf, &dev->configs, list_item)
+			list_for_each_entry(f, &conf->enabled_functions,
+						enabled_list) {
+				if (f->disable)
+					f->disable(f);
+			}
 		dev->enabled = false;
 		mdelay(5);
 	} else if (!enabled) {
@@ -1473,6 +1539,7 @@ static int android_bind(struct usb_composite_dev *cdev)
 {
 	struct android_dev *dev;
 	struct usb_gadget	*gadget = cdev->gadget;
+	struct android_configuration *conf;
 	int			gcnum, id, ret;
 
 	/* Bind to the last android_dev that was probed */
@@ -1561,6 +1628,7 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	struct android_dev		*dev = cdev_to_android_dev(cdev);
 	struct usb_request		*req = cdev->req;
 	struct android_usb_function	*f;
+	struct android_configuration	*conf;
 	int value = -EOPNOTSUPP;
 	unsigned long flags;
 
@@ -1569,13 +1637,16 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
 
-	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
-		if (f->ctrlrequest) {
-			value = f->ctrlrequest(f, cdev, c);
-			if (value >= 0)
-				break;
-		}
-	}
+	list_for_each_entry(conf, &dev->configs, list_item)
+		if (&conf->usb_config == cdev->config)
+			list_for_each_entry(f,
+					    &conf->enabled_functions,
+					    enabled_list)
+				if (f->ctrlrequest) {
+					value = f->ctrlrequest(f, cdev, c);
+					if (value >= 0)
+						break;
+				}
 
 
 	/* Special case the accessory function.
@@ -1672,6 +1743,38 @@ static struct android_dev *cdev_to_android_dev(struct usb_composite_dev *cdev)
 	return dev;
 }
 
+static struct android_configuration *alloc_android_config
+						(struct android_dev *dev)
+{
+	struct android_configuration *conf;
+
+	conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+	if (!conf) {
+		pr_err("%s(): Failed to alloc memory for android conf\n",
+			__func__);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	dev->configs_num++;
+	conf->usb_config.label = dev->name;
+	conf->usb_config.unbind = android_unbind_config;
+	conf->usb_config.bConfigurationValue = dev->configs_num;
+
+	INIT_LIST_HEAD(&conf->enabled_functions);
+
+	list_add_tail(&conf->list_item, &dev->configs);
+
+	return conf;
+}
+
+static void free_android_config(struct android_dev *dev,
+			     struct android_configuration *conf)
+{
+	list_del(&conf->list_item);
+	dev->configs_num--;
+	kfree(conf);
+}
+
 static int __devinit android_probe(struct platform_device *pdev)
 {
 	struct android_usb_platform_data *pdata = pdev->dev.platform_data;
@@ -1692,12 +1795,11 @@ static int __devinit android_probe(struct platform_device *pdev)
 		goto err_alloc;
 	}
 
-	android_dev->config.label = pdev->name;
-	android_dev->config.unbind = android_unbind_config;
-	android_dev->config.bConfigurationValue = 1;
+	android_dev->name = pdev->name;
 	android_dev->disable_depth = 1;
 	android_dev->functions = supported_functions;
-	INIT_LIST_HEAD(&android_dev->enabled_functions);
+	android_dev->configs_num = 0;
+	INIT_LIST_HEAD(&android_dev->configs);
 	INIT_WORK(&android_dev->work, android_work);
 	mutex_init(&android_dev->mutex);
 
