@@ -70,7 +70,7 @@ static uint32_t oom_count = 0;
 #define OOM_DEPTH 7
 #endif
 
-static uint32_t lowmem_debug_level = 2;
+static uint32_t lowmem_debug_level = 1;
 static int lowmem_adj[6] = {
 	0,
 	1,
