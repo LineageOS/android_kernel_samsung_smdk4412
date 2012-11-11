@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAa3//9So\u003d",
+        "filename": "drivers/misc/modem_if/modem_link_device_hsic.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 272,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2012-11-11T21:45:43Z",
+      "side": 1,
+      "message": "don\u0027t make driver spammy again",
+      "revId": "6c1b25efad69d5b42862ff7104ba2761a93ec920",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAa3//9Sk\u003d",
+        "filename": "drivers/misc/modem_if/modem_link_device_hsic.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 486,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2012-11-11T21:45:43Z",
+      "side": 1,
+      "message": "don\u0027t make driver spammy again",
+      "revId": "6c1b25efad69d5b42862ff7104ba2761a93ec920",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAa3//9SU\u003d",
+        "filename": "drivers/misc/modem_if/modem_modemctl_device_sprd8803.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2012-11-11T21:45:43Z",
+      "side": 1,
+      "message": "spammy",
+      "revId": "6c1b25efad69d5b42862ff7104ba2761a93ec920",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
