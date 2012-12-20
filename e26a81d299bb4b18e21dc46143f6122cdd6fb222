@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAbH//9Qg\u003d",
+        "filename": "arch/arm/plat-s5p/reserve_mem.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 2874
+      },
+      "writtenOn": "2012-12-20T05:15:38Z",
+      "side": 1,
+      "message": "Some ZOMG here as well",
+      "revId": "e26a81d299bb4b18e21dc46143f6122cdd6fb222",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
