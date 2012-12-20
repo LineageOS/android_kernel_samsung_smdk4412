@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAbH//9Q0\u003d",
+        "filename": "arch/arm/plat-s5p/reserve_mem.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 2874
+      },
+      "writtenOn": "2012-12-20T05:13:17Z",
+      "side": 1,
+      "message": "ZOMG!",
+      "revId": "ace284d84a5a092e5d6e809aa7ff3f6dca971598",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAAbH//9Qw\u003d",
+        "filename": "drivers/char/exynos_mem.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 312,
+      "author": {
+        "id": 2874
+      },
+      "writtenOn": "2012-12-20T05:13:17Z",
+      "side": 1,
+      "message": "ZOMG^2",
+      "revId": "ace284d84a5a092e5d6e809aa7ff3f6dca971598",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
