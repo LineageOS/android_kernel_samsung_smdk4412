@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAcn//9Lc\u003d",
+        "filename": "arch/arm/mach-exynos/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 158,
+      "author": {
+        "id": 2793
+      },
+      "writtenOn": "2013-01-15T01:41:40Z",
+      "side": 0,
+      "message": "Why are you dorking with p4note stuff in a t0lte support patch?\n\nAlso - this will break GPS on N801x",
+      "revId": "b797be24f3bf069ee030b75b8fda0f00dbe89bf1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
