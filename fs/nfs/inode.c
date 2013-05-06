@@ -78,7 +78,7 @@ int nfs_wait_bit_killable(void *word)
 {
 	if (fatal_signal_pending(current))
 		return -ERESTARTSYS;
-	freezable_schedule();
+	freezable_schedule_unsafe();
 	return 0;
 }
 
