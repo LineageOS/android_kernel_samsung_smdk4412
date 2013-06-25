@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dac4157f_3ce73d42",
+        "filename": "arch/arm/plat-samsung/pm.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 323,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-06-25T17:32:28Z",
+      "side": 1,
+      "message": "this change affects all devices because CONFIG_SEC_MODEM is used on all samsung devices. afaik this part is not present on i9300 sourcecode.",
+      "revId": "2386e96bc313e334f01dfd7d5945580d773ddc07",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dac4157f_7cddb56f",
+        "filename": "include/linux/sensor/sensors_core.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-06-25T17:32:28Z",
+      "side": 1,
+      "message": "where is this used?",
+      "revId": "2386e96bc313e334f01dfd7d5945580d773ddc07",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
