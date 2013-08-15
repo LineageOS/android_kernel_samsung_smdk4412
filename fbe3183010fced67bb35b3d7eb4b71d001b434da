@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dae975fb_a43aefcb",
+        "filename": "drivers/media/video/samsung/mali/arch-orion-m400/config.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 139,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-08-15T21:58:25Z",
+      "side": 1,
+      "message": "only exynos4210 devices are using this header. useless ifdef",
+      "revId": "fbe3183010fced67bb35b3d7eb4b71d001b434da",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dae975fb_e41fd759",
+        "filename": "kernel/sched.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-08-15T21:58:25Z",
+      "side": 1,
+      "message": "srsly?",
+      "revId": "fbe3183010fced67bb35b3d7eb4b71d001b434da",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dae975fb_c424d3b0",
+        "filename": "kernel/sched.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4290,
+      "author": {
+        "id": 523
+      },
+      "writtenOn": "2013-08-15T21:58:25Z",
+      "side": 1,
+      "message": "srsly?",
+      "revId": "fbe3183010fced67bb35b3d7eb4b71d001b434da",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
