@@ -30,6 +30,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 	pmd_t *pmd;
 	pte_t *pte;
 	int err = -EFAULT;
+	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
 
 	*code_out = SEGV_MAPERR;
 
@@ -40,6 +41,9 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 	if (in_atomic())
 		goto out_nosemaphore;
 
+	if (is_user)
+		flags |= FAULT_FLAG_USER;
+retry:
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -55,12 +59,15 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 
 good_area:
 	*code_out = SEGV_ACCERR;
-	if (is_write && !(vma->vm_flags & VM_WRITE))
-		goto out;
-
-	/* Don't require VM_READ|VM_EXEC for write faults! */
-	if (!is_write && !(vma->vm_flags & (VM_READ | VM_EXEC)))
-		goto out;
+	if (is_write) {
+		if (!(vma->vm_flags & VM_WRITE))
+			goto out;
+		flags |= FAULT_FLAG_WRITE;
+	} else {
+		/* Don't require VM_READ|VM_EXEC for write faults! */
+		if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
+			goto out;
+	}
 
 	do {
 		int fault;
