@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3a29b11f_e85d5bed",
+        "filename": "arch/arm/mach-exynos/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 1138,
+      "author": {
+        "id": 1039
+      },
+      "writtenOn": "2013-11-23T12:48:46Z",
+      "side": 1,
+      "message": "useless space change",
+      "revId": "b08ab5b5f2607350e5e678f2eb6ec35de4d32bb7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a29b11f_48524fdf",
+        "filename": "drivers/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 168,
+      "author": {
+        "id": 1039
+      },
+      "writtenOn": "2013-11-23T12:48:46Z",
+      "side": 1,
+      "message": "useless space change",
+      "revId": "b08ab5b5f2607350e5e678f2eb6ec35de4d32bb7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a29b11f_6872ab7e",
+        "filename": "drivers/video/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 1039
+      },
+      "writtenOn": "2013-11-23T12:48:46Z",
+      "side": 1,
+      "message": "useless",
+      "revId": "b08ab5b5f2607350e5e678f2eb6ec35de4d32bb7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a29b11f_886f0792",
+        "filename": "drivers/video/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1039
+      },
+      "writtenOn": "2013-11-23T12:48:46Z",
+      "side": 1,
+      "message": "useless ?",
+      "revId": "b08ab5b5f2607350e5e678f2eb6ec35de4d32bb7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
