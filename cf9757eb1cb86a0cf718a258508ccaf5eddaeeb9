@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a5ae5dd_a4b5377f",
+        "filename": "fs/exfat/Makefile",
+        "patchSetId": 3
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 2608
+      },
+      "writtenOn": "2014-01-09T07:33:22Z",
+      "side": 1,
+      "message": "whitespace cleanup plesae",
+      "revId": "cf9757eb1cb86a0cf718a258508ccaf5eddaeeb9",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
