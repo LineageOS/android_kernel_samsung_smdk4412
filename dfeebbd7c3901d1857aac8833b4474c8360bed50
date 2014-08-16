@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a1b2928_3f688bba",
+        "filename": "drivers/video/samsung/s3cfb_ops.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 5728
+      },
+      "writtenOn": "2014-08-16T00:27:56Z",
+      "side": 1,
+      "message": "Android graphics not working properly with SUPPORT_LPM_PAN_DISPLAY enabled. But the new KitKat lpm binary need this value enabled: https://github.com/kumajaya/android_kernel_samsung_smdk4x12/commit/e46ccc1b97293639281ff6ed5786136f987c50b9",
+      "revId": "dfeebbd7c3901d1857aac8833b4474c8360bed50",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
