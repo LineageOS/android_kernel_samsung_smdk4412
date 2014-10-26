@@ -98,7 +98,7 @@ static int get_parent_ino(struct inode *inode, nid_t *pino)
 	spin_lock(&inode->i_lock);
 	if (!list_empty(&inode->i_dentry)) {
 		dentry = list_first_entry(&inode->i_dentry,
-					  struct dentry, d_alias);
+					  struct dentry, d_u.d_alias);
 		dget(dentry);
 	}
 	spin_unlock(&inode->i_lock);
