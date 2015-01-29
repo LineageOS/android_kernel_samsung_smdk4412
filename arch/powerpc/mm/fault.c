@@ -310,13 +310,15 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	ret = handle_mm_fault(mm, vma, address, is_write ? FAULT_FLAG_WRITE : 0);
-	if (unlikely(ret & VM_FAULT_ERROR)) {
-		if (ret & VM_FAULT_OOM)
-			goto out_of_memory;
-		else if (ret & VM_FAULT_SIGBUS)
-			goto do_sigbus;
-		BUG();
+	fault = handle_mm_fault(mm, vma, address, flags);
+	if (unlikely(fault & (VM_FAULT_RETRY|VM_FAULT_ERROR))) {
+		int rc;
+
+		if (fault & VM_FAULT_SIGSEGV)
+			goto bad_area;
+		rc = mm_fault_error(regs, address, fault);
+		if (rc >= MM_FAULT_RETURN)
+			return rc;
 	}
 	if (ret & VM_FAULT_MAJOR) {
 		current->maj_flt++;
