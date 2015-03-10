@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9ad45d7e_c5efdfae",
+        "filename": "drivers/net/wireless/bcmdhd/dhd_custom_sec.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1105,
+      "author": {
+        "id": 9776
+      },
+      "writtenOn": "2015-03-10T22:49:36Z",
+      "side": 1,
+      "message": "as a matter of taste, maybe it is best to drop this constant and inline the sizeof, as it was done in patch set 1.",
+      "revId": "880ad8af057233c49980916aff9f984f80f6dd23",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9ad45d7e_4503ef73",
+        "filename": "drivers/net/wireless/bcmdhd/dhd_custom_sec.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1112,
+      "author": {
+        "id": 9776
+      },
+      "writtenOn": "2015-03-10T22:49:36Z",
+      "side": 1,
+      "message": "sprintf is dangerous and should not be used. snprintf should be used instead.",
+      "revId": "880ad8af057233c49980916aff9f984f80f6dd23",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9ad45d7e_a5f8eb7d",
+        "filename": "drivers/net/wireless/bcmdhd/dhd_custom_sec.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1128,
+      "author": {
+        "id": 9776
+      },
+      "writtenOn": "2015-03-10T22:49:36Z",
+      "side": 1,
+      "message": "sizeof(buf) - 1 is horrible. either the return value of s(n)printf should be used, or a proper length constant.",
+      "revId": "880ad8af057233c49980916aff9f984f80f6dd23",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9ad45d7e_85f5e784",
+        "filename": "drivers/net/wireless/bcmdhd/dhd_custom_sec.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1131,
+      "author": {
+        "id": 9776
+      },
+      "writtenOn": "2015-03-10T22:49:36Z",
+      "side": 1,
+      "message": "the various DHD_*() loggers write the mac address with a trailing \u0027\\n\u0027 which is ugly and probably unintended.",
+      "revId": "880ad8af057233c49980916aff9f984f80f6dd23",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
