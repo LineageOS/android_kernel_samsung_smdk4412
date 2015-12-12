@@ -52,7 +52,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <asm/gpio.h>
 #include <linux/miscdevice.h>
 #include <asm/uaccess.h>
-#include <linux/earlysuspend.h>
 #include <asm/io.h>
 #include <linux/hrtimer.h>
 //mhsong #include <m8c.h>        // part specific constants and macros

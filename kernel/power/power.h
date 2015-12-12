@@ -275,12 +275,6 @@ extern struct wake_lock sync_wake_lock;
 extern suspend_state_t requested_suspend_state;
 #endif
 
-#ifdef CONFIG_EARLYSUSPEND
-/* kernel/power/earlysuspend.c */
-void request_suspend_state(suspend_state_t state);
-suspend_state_t get_suspend_state(void);
-#endif
-
 struct pm_wd_data {
 	struct task_struct *tsk;
 	int timeout;
