@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1fcbff3d_38b99be8",
+        "filename": "sound/soc/codecs/mc1n2/mcdriver.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 858,
+      "author": {
+        "id": 12082
+      },
+      "writtenOn": "2016-02-07T20:39:50Z",
+      "side": 1,
+      "message": "This same thing is ifdef\u0027ed 4 lines above",
+      "range": {
+        "startLine": 858,
+        "startChar": 4,
+        "endLine": 858,
+        "endChar": 35
+      },
+      "revId": "089321b5982b029ce0d7f3318f2043e775ce40ed",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
