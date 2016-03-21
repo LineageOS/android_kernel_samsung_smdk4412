@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7faddb67_9c2c929a",
+        "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 216,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-03-21T09:21:25Z",
+      "side": 1,
+      "message": "this is the alloc",
+      "range": {
+        "startLine": 216,
+        "startChar": 7,
+        "endLine": 216,
+        "endChar": 25
+      },
+      "revId": "ac26ab9825e5fe10e5062d503e1bedeafe62c65c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_dc18ca76",
+        "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 414,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-03-21T09:21:25Z",
+      "side": 1,
+      "message": "it looks to me like this belongs under err_fw_state, since alloc occurs before there, so it\u0027s possible to have alloc\u0027d but have the firmware in a bad state so we\u0027d end up with mem leaks again.",
+      "range": {
+        "startLine": 414,
+        "startChar": 0,
+        "endLine": 414,
+        "endChar": 25
+      },
+      "revId": "ac26ab9825e5fe10e5062d503e1bedeafe62c65c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
