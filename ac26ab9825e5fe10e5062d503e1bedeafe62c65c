@@ -25,6 +25,57 @@
     },
     {
       "key": {
+        "uuid": "7faddb67_340fb22f",
+        "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 343,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-03-22T09:21:51Z",
+      "side": 1,
+      "message": "i don\u0027t see a matching atomic_dec if anything below here fails",
+      "revId": "ac26ab9825e5fe10e5062d503e1bedeafe62c65c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_d41bbe70",
+        "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 344,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-03-22T09:21:51Z",
+      "side": 1,
+      "message": "similarly, this should get NULL\u0027d and destroyed as in mfc_release",
+      "revId": "ac26ab9825e5fe10e5062d503e1bedeafe62c65c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7faddb67_1412b659",
+        "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 405,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-03-22T09:21:51Z",
+      "side": 1,
+      "message": "this should be below err_inst_ctx",
+      "revId": "ac26ab9825e5fe10e5062d503e1bedeafe62c65c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7faddb67_dc18ca76",
         "filename": "drivers/media/video/samsung/mfc5x/mfc_dev.c",
         "patchSetId": 1
