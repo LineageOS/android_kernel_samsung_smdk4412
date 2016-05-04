@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_868e5676",
+        "filename": "drivers/input/keyboard/cypress/Kconfig",
+        "patchSetId": 1
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-05-04T11:11:21Z",
+      "side": 1,
+      "message": "depends on !KEYBOARD_CYPRESS_TOUCH ?",
+      "revId": "b766a78f8c21a513dac34af954deb12050084b6f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_26e9a219",
+        "filename": "drivers/input/touchscreen/Kconfig",
+        "patchSetId": 1
+      },
+      "lineNbr": 1028,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-05-04T11:11:21Z",
+      "side": 1,
+      "message": "you shouldn\u0027t have this - the config option in drivers/input/keyboard/cypress is all that is needed",
+      "revId": "b766a78f8c21a513dac34af954deb12050084b6f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
