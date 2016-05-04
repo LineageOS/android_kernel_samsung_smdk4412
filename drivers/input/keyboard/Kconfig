@@ -587,4 +587,6 @@ config KEYBOARD_TC370L_TOUCHKEY
 
 source "drivers/input/keyboard/cypress/Kconfig"
 
+source "drivers/input/keyboard/cypressbln/Kconfig"
+
 endif
