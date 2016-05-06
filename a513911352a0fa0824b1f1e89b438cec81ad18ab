@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5faad753_f4456f18",
+        "filename": "drivers/input/keyboard/cypressbln/Kconfig",
+        "patchSetId": 12
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-05-06T06:00:14Z",
+      "side": 1,
+      "message": "Do you really need this (shouldn\u0027t it be implied by KEYBOARD_CYPRESS_TOUCH_BLN?)",
+      "revId": "a513911352a0fa0824b1f1e89b438cec81ad18ab",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_343c6792",
+        "filename": "drivers/input/touchscreen/mxt224_u1.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 1213,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-05-06T06:00:14Z",
+      "side": 1,
+      "message": "should be \u0027defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN) \u0026\u0026 defined(CONFIG_TOUCKEY_BLN)\u0027\n\n(no spaces, you need a defined for each CONFIG_ option)",
+      "revId": "a513911352a0fa0824b1f1e89b438cec81ad18ab",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5faad753_d440730a",
+        "filename": "drivers/input/touchscreen/mxt224_u1.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 1343,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2016-05-06T06:00:14Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "a513911352a0fa0824b1f1e89b438cec81ad18ab",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
