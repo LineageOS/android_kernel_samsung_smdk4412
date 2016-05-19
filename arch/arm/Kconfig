@@ -1777,10 +1777,7 @@ config ARM_FLUSH_CONSOLE_ON_RESTART
 	  pending messages to be flushed.
 
 
-
 endmenu
-
-source "arch/arm/mvp/Kconfig"
 
 menu "Boot options"
 
