@@ -23,6 +23,10 @@
 #include <linux/mfd/max77693-private.h>
 
 #define SEC_DEBUG_VIB
+#define PWM_MIN 0
+#define PWM_DEFAULT 50
+#define PWM_THRESH 75
+#define PWM_MAX 100
 
 struct max77693_haptic_data {
 	struct max77693_dev *max77693;
@@ -304,6 +308,42 @@ static ssize_t pwm_value_store(struct device *dev,
 static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
 		pwm_value_show, pwm_value_store);
 
+static ssize_t pwm_default_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", PWM_DEFAULT);
+}
+
+static DEVICE_ATTR(pwm_default, S_IRUGO,
+		pwm_default_show, NULL);
+
+static ssize_t pwm_max_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", PWM_MAX);
+}
+
+static DEVICE_ATTR(pwm_max, S_IRUGO,
+		pwm_max_show, NULL);
+
+static ssize_t pwm_min_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", PWM_MIN);
+}
+
+static DEVICE_ATTR(pwm_min, S_IRUGO,
+		pwm_min_show, NULL);
+
+static ssize_t pwm_threshold_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", PWM_THRESH);
+}
+
+static DEVICE_ATTR(pwm_threshold, S_IRUGO,
+		pwm_threshold_show, NULL);
+
 static int max77693_haptic_probe(struct platform_device *pdev)
 {
 	int error = 0;
@@ -384,6 +424,23 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 	if (error < 0) {
 		pr_err("[VIB] device_create fail: pwm_value\n");
 	}
+	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_max);
+	if (error < 0) {
+		pr_err("[VIB] create sysfs fail: pwm_max\n");
+	}
+	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_min);
+	if (error < 0) {
+		pr_err("[VIB] create sysfs fail: pwm_min\n");
+	}
+	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_default);
+	if (error < 0) {
+		pr_err("[VIB] create sysfs fail: pwm_default\n");
+	}
+	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_threshold);
+	if (error < 0) {
+		pr_err("[VIB] create sysfs fail: pwm_threshold\n");
+	}
+
 #endif
 	printk(KERN_DEBUG "[VIB] timed_output device is registrated\n");
 	pr_debug("[VIB] -- %s\n", __func__);
