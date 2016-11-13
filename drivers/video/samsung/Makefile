@@ -17,6 +17,7 @@ obj-$(CONFIG_FB_S5P_LD9040)	+= ld9040.o smart_dimming_ld9042.o
 obj-$(CONFIG_FB_S5P_GD2EVF)	+= gd2evf.o
 obj-$(CONFIG_FB_S5P_NT35560)	+= nt35560.o
 obj-$(CONFIG_FB_S5P_MDNIE)      += s3cfb_mdnie.o s3cfb_ielcd.o mdnie.o mdnie_tuning.o
+obj-$(CONFIG_FB_MDNIE_RGB_ADJUST) += mdnie_rgb_adj.o
 obj-$(CONFIG_FB_S5P_LMS501KF03)	+= s3cfb_lms501kf03.o
 obj-$(CONFIG_FB_S5P_LMS501XX)	+= s3cfb_lms501xx.o
 obj-$(CONFIG_FB_S5P_DUMMY_MIPI_LCD)	+= s3cfb_dummymipilcd.o

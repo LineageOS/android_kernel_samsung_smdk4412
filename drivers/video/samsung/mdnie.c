@@ -84,6 +84,10 @@
 #include "mdnie_dmb.h"
 #endif
 
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+#include "mdnie_rgb_adj.h"
+#endif
+
 #if defined(CONFIG_FB_MDNIE_PWM)
 #define MIN_BRIGHTNESS		0
 #define MAX_BRIGHTNESS_LEVEL		255
@@ -131,6 +135,10 @@ static int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *s
 {
 	int ret = 0, i = 0;
 	const unsigned short *wbuf = NULL;
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+	u16 res = 0;
+	bool did_apply_rgb = false;
+#endif
 
 	if (IS_ERR_OR_NULL(seq)) {
 		dev_err(mdnie->dev, "mdnie sequence is null\n");
@@ -144,7 +152,27 @@ static int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *s
 	mdnie_mask();
 
 	while (wbuf[i] != END_SEQ) {
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+		if (wbuf[i] == MDNIE_EFFECT_MASTER) {
+			// ensure that scr is enabled
+			res = mdnie_effect_master_hook(mdnie, wbuf[i+1]);
+			ret += mdnie_write(wbuf[i], res);
+		} else if (wbuf[i] >= MDNIE_SCR_START && wbuf[i] <= MDNIE_SCR_END) {
+			did_apply_rgb = true;
+			res = mdnie_rgb_hook(mdnie, wbuf[i], wbuf[i+1]);
+			ret += mdnie_write(wbuf[i], res);
+		} else {
+			if (!did_apply_rgb && wbuf[i] > MDNIE_SCR_END) {
+				// not all profiles have SCR config, fake it if we have to
+				dev_notice(mdnie->dev, "faking SCR config\n");
+				mdnie_send_rgb(mdnie);
+				did_apply_rgb = true;
+			}
+			ret += mdnie_write(wbuf[i], wbuf[i+1]);
+		}
+#else
 		ret += mdnie_write(wbuf[i], wbuf[i+1]);
+#endif
 		i += 2;
 	}
 
@@ -796,6 +824,59 @@ static ssize_t accessibility_store(struct device *dev,
 
 	return count;
 }
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+#define ADJ_ATTR(name) \
+static ssize_t show_##name (struct device *dev, \
+		struct device_attribute *attr, char *buf) \
+{ \
+	struct mdnie_info *mdnie = dev_get_drvdata(dev); \
+\
+	return sprintf(buf, "%u\n", mdnie->name); \
+} \
+\
+static ssize_t store_##name (struct device *dev, \
+		struct device_attribute *attr, const char *buf, size_t size) \
+{ \
+	struct mdnie_info *mdnie = dev_get_drvdata(dev); \
+	u8 value; \
+	int ret; \
+\
+	ret = strict_strtoul(buf, 0, (unsigned long *)&value); \
+\
+	if (value == 0) /* never allow turning a colour off completely */ \
+		value = 1; \
+\
+	mdnie->name = value; \
+\
+	mdnie_update(mdnie); \
+\
+	return size; \
+}
+
+ADJ_ATTR(r_adj);
+ADJ_ATTR(g_adj);
+ADJ_ATTR(b_adj);
+
+static ssize_t show_rgb_adj_enable(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	return sprintf(buf, "%u\n", mdnie->rgb_adj_enable);
+}
+
+static ssize_t store_rgb_adj_enable(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	int value, ret;
+
+	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
+
+	mdnie->rgb_adj_enable = (value != 0);
+	mdnie_update(mdnie);
+	return size;
+}
+#endif
 
 #if !defined(CONFIG_FB_MDNIE_PWM)
 static ssize_t color_correct_show(struct device *dev,
@@ -828,6 +909,12 @@ static struct device_attribute mdnie_attributes[] = {
 	__ATTR(accessibility, 0664, accessibility_show, accessibility_store),
 #if !defined(CONFIG_FB_MDNIE_PWM)
 	__ATTR(color_correct, 0444, color_correct_show, NULL),
+#endif
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+	__ATTR(r_adj, 0666, show_r_adj, store_r_adj),
+	__ATTR(g_adj, 0666, show_g_adj, store_g_adj),
+	__ATTR(b_adj, 0666, show_b_adj, store_b_adj),
+	__ATTR(rgb_adj_enable, 0666, show_rgb_adj_enable, store_rgb_adj_enable),
 #endif
 	__ATTR_NULL,
 };
@@ -912,6 +999,13 @@ static int mdnie_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto error1;
 	}
+
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+	mdnie->r_adj = 255;
+	mdnie->g_adj = 255;
+	mdnie->b_adj = 255;
+	mdnie->rgb_adj_enable = 1;
+#endif
 
 	mdnie->dev = device_create(mdnie_class, &pdev->dev, 0, &mdnie, "mdnie");
 	if (IS_ERR_OR_NULL(mdnie->dev)) {
