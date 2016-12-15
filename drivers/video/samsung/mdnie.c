@@ -533,6 +533,11 @@ static ssize_t mode_store(struct device *dev,
 	return count;
 }
 
+static ssize_t mode_max_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", MODE_MAX);
+}
 
 static ssize_t scenario_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -901,6 +906,7 @@ static ssize_t color_correct_show(struct device *dev,
 
 static struct device_attribute mdnie_attributes[] = {
 	__ATTR(mode, 0664, mode_show, mode_store),
+	__ATTR(mode_max, 0664, mode_max_show, NULL),
 	__ATTR(scenario, 0664, scenario_show, scenario_store),
 #if defined(CONFIG_FB_MDNIE_PWM)
 	__ATTR(cabc, 0664, cabc_show, cabc_store),
