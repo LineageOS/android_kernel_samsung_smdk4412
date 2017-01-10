@@ -554,10 +554,8 @@ static struct clksrc_sources exynos4_clkset_vpllsrc = {
 static struct clksrc_clk exynos4_clk_vpllsrc = {
 	.clk	= {
 		.name		= "vpll_src",
-#ifdef CONFIG_MALI_VER_R4P0
 		.enable		= exynos4_clksrc_mask_top_ctrl,
 		.ctrlbit	= (1 << 0),
-#endif
 	},
 	.sources = &exynos4_clkset_vpllsrc,
 	.reg_src = { .reg = EXYNOS4_CLKSRC_TOP1, .shift = 0, .size = 1 },
