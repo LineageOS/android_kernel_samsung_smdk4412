@@ -129,8 +129,6 @@ ccflags-$(CONFIG_MALI400_INTERNAL_PROFILING) += -I$(srctree)/$(src)/timestamp-$(
 mali-$(CONFIG_DMA_SHARED_BUFFER) += linux/mali_memory_dma_buf.o
 mali-$(CONFIG_SYNC) += linux/mali_sync.o
 
-mali-$(CONFIG_MALI400_UMP) += linux/mali_memory_ump.o
-
 mali-$(CONFIG_MALI400_POWER_PERFORMANCE_POLICY) += common/mali_power_performance_policy.o
 
 # Tell the Linux build system from which .o file to create the kernel module
@@ -154,7 +152,6 @@ ifeq ($(MALI_UPPER_HALF_SCHEDULING),1)
 	ccflags-y += -DMALI_UPPER_HALF_SCHEDULING
 endif
 
-ccflags-$(CONFIG_MALI400_UMP) += -I$(srctree)/$(src)/../ump/include/ump
 ccflags-$(CONFIG_MALI400_DEBUG) += -DDEBUG
 
 # Use our defines when compiling
