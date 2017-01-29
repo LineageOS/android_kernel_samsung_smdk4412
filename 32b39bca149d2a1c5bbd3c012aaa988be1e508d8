@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a437d4f_6b6a051c",
+        "filename": "arch/arm/configs/lineageos_n5110_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 523,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2017-01-29T08:42:35Z",
+      "side": 1,
+      "message": "this line was changed",
+      "revId": "32b39bca149d2a1c5bbd3c012aaa988be1e508d8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_4b774103",
+        "filename": "arch/arm/configs/lineageos_n5110_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2017-01-29T08:42:35Z",
+      "side": 1,
+      "message": "also changed",
+      "revId": "32b39bca149d2a1c5bbd3c012aaa988be1e508d8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_2b74fdfb",
+        "filename": "arch/arm/configs/lineageos_n5110_defconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 2339,
+      "author": {
+        "id": 11604
+      },
+      "writtenOn": "2017-01-29T08:42:35Z",
+      "side": 1,
+      "message": "i think you get the point?",
+      "revId": "32b39bca149d2a1c5bbd3c012aaa988be1e508d8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
