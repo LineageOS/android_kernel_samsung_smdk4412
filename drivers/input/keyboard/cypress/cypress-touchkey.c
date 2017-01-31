@@ -1073,7 +1073,7 @@ static ssize_t touchkey_led_control(struct device *dev,
 	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(dev);
 	int data;
 	int ret;
-	static const int ledCmd[] = {TK_CMD_LED_ON, TK_CMD_LED_OFF};
+	static const int ledCmd[] = {TK_CMD_LED_OFF, TK_CMD_LED_ON};
 
 #if defined(CONFIG_TARGET_LOCALE_KOR)
 	if (touchkey_probe == false)
@@ -1086,7 +1086,7 @@ static ssize_t touchkey_led_control(struct device *dev,
 		return size;
 	}
 
-	if (data != 1 && data != 2) {
+	if (data != 0 && data != 1) {
 		printk(KERN_DEBUG "[TouchKey] %s wrong cmd %x\n",
 			__func__, data);
 		return size;
@@ -1094,9 +1094,9 @@ static ssize_t touchkey_led_control(struct device *dev,
 
 #if defined(CONFIG_TARGET_LOCALE_NA)
 	if (tkey_i2c->module_ver >= 8)
-		data = ledCmd[data-1];
+		data = ledCmd[data];
 #else
-	data = ledCmd[data-1];
+	data = ledCmd[data];
 #endif
 
 	ret = i2c_touchkey_write(tkey_i2c->client, (u8 *) &data, 1);
