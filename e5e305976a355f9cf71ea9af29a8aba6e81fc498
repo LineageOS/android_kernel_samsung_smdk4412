@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa5d592f_7e2659bc",
+        "filename": "drivers/media/video/s5c73m3.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1038,
+      "author": {
+        "id": 14088
+      },
+      "writtenOn": "2017-02-15T19:08:34Z",
+      "side": 1,
+      "message": "last missing tabs",
+      "range": {
+        "startLine": 1038,
+        "startChar": 0,
+        "endLine": 1038,
+        "endChar": 61
+      },
+      "revId": "e5e305976a355f9cf71ea9af29a8aba6e81fc498",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
