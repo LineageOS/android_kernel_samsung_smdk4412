@@ -1669,9 +1669,10 @@ void s3c_fb_update_regs(struct s3cfb_global *fbdev, struct s3c_reg_data *regs)
 #endif
 }
 
-static inline u32 blendeq(enum s3c_fb_blending blending, u8 transp_length)
+static inline u32 blendeq(enum s3c_fb_blending blending, u8 transp_length, int plane_alpha)
 {
 	u8 a, b;
+	int is_plane_alpha = (plane_alpha < 255 && plane_alpha > 0) ? 1 : 0;
 
 	if (transp_length == 1 && blending == S3C_FB_BLENDING_PREMULT)
 		blending = S3C_FB_BLENDING_COVERAGE;
@@ -1683,8 +1684,13 @@ static inline u32 blendeq(enum s3c_fb_blending blending, u8 transp_length)
 		break;
 
 	case S3C_FB_BLENDING_PREMULT:
-		a = BLENDEQ_COEF_ONE;
-		b = BLENDEQ_COEF_ONE_MINUS_ALPHA_A;
+		if (!is_plane_alpha) {
+			a = BLENDEQ_COEF_ONE;
+			b = BLENDEQ_COEF_ONE_MINUS_ALPHA_A;
+		} else {
+                        a = BLENDEQ_COEF_ALPHA0;
+                        b = BLENDEQ_COEF_ONE_MINUS_ALPHA_A;
+                }
 		break;
 
 	case S3C_FB_BLENDING_COVERAGE:
@@ -1753,6 +1759,11 @@ static int s3c_fb_set_win_buffer(struct s3cfb_global *fbdev,
 	if (win_config->w == 0 || win_config->h == 0) {
 		dev_err(fbdev->dev, "window is size 0 (w = %u, h = %u)\n",
 				win_config->w, win_config->h);
+		return -EINVAL;
+	}
+
+	if (win_no == 0 && win_config->plane_alpha < 255) {
+		dev_err(fbdev->dev, "alpha not allowed on window 0\n");
 		return -EINVAL;
 	}
 
@@ -1859,7 +1870,11 @@ static int s3c_fb_set_win_buffer(struct s3cfb_global *fbdev,
 			win_config->w, win_config->h,
 			fb->var.bits_per_pixel);
 
-	if (fb->var.transp.length == 1 &&
+	// copied from exynos7 kernel drivers/video/exynos/decon/decon_core.c
+	if ((win_config->plane_alpha > 0) && (win_config->plane_alpha < 0xFF)) {
+                alpha0 = win_config->plane_alpha;
+                alpha1 = 0;
+        } else if (fb->var.transp.length == 1 &&
 			win_config->blending == S3C_FB_BLENDING_NONE) {
 		alpha0 = 0xff;
 		alpha1 = 0xff;
@@ -1892,7 +1907,7 @@ static int s3c_fb_set_win_buffer(struct s3cfb_global *fbdev,
 			fb->var.red.length);
 	if (win_no)
 		regs->blendeq[win_no - 1] = blendeq(win_config->blending,
-				fb->var.transp.length);
+				fb->var.transp.length, win_config->plane_alpha);
 
 	return 0;
 
