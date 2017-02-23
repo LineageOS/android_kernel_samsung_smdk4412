@@ -263,6 +263,47 @@ void vibtonz_pwm(int nForce)
 EXPORT_SYMBOL(vibtonz_pwm);
 #endif
 
+static ssize_t pwm_value_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+
+	int count, pwm_val;
+	struct max77693_platform_data *pdata = dev_get_platdata(dev_get_drvdata(dev->parent));
+
+	pwm_val = (pdata->haptic_data->duty - 18525) * 100 / 18525;
+
+	count = sprintf(buf, "%lu\n", pwm_val);
+
+	return count;
+}
+
+static ssize_t pwm_value_store(struct device *dev,
+		struct device_attribute *attr, char *buf, size_t size)
+{
+	int pwm_duty;
+	int pwm_val = 0;
+	struct max77693_platform_data *pdata = dev_get_platdata(dev_get_drvdata(dev->parent));
+
+	if (kstrtoul(buf, 0, &pwm_val)) {
+		pr_err("%s: error parsing pwm_val", __func__);
+	}
+
+	pwm_duty = (pwm_val * 18525) / 100 + 18525;
+
+	/* make sure duty is in range */
+	if (pwm_duty > 37050) {
+		pwm_duty = 37050;
+	} else if (pwm_duty < 18525) {
+		pwm_duty = 18525;
+	}
+
+	pdata->haptic_data->duty = pwm_duty;
+	return size;
+}
+
+static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
+		pwm_value_show, pwm_value_store);
+
 static int max77693_haptic_probe(struct platform_device *pdev)
 {
 	int error = 0;
@@ -337,6 +378,11 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 		pr_err("[VIB] Failed to register timed_output : %d\n", error);
 		error = -EFAULT;
 		goto err_timed_output_register;
+	}
+
+	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_value);
+	if (error < 0) {
+		pr_err("[VIB] device_create fail: pwm_value\n");
 	}
 #endif
 	printk(KERN_DEBUG "[VIB] timed_output device is registrated\n");
