@@ -1,9 +1,9 @@
 /*
  * Include file private to the SOC Interconnect support files.
  *
- * Copyright (C) 1999-2011, Broadcom Corporation
+ * Copyright (C) 1999-2013, Broadcom Corporation
  * 
- *         Unless you and Broadcom execute a separate written software license
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils_priv.h,v 1.17.4.3 2010-10-25 16:56:56 Exp $
+ * $Id: siutils_priv.h 431423 2013-10-23 16:07:35Z $
  */
 
 #ifndef	_siutils_priv_h_
@@ -31,8 +31,11 @@
 
 #define	SI_MSG(args)
 
-/* Define SI_VMSG to printf for verbose debugging, but don't check it in */
+#ifdef BCMDBG_SI
+#define	SI_VMSG(args)	printf args
+#else
 #define	SI_VMSG(args)
+#endif
 
 #define	IS_SIM(chippkg)	((chippkg == HDLSIM_PKG_ID) || (chippkg == HWSIM_PKG_ID))
 
@@ -47,6 +50,35 @@ typedef struct gpioh_item {
 	uint32			event;
 	struct gpioh_item	*next;
 } gpioh_item_t;
+
+
+#define SI_GPIO_MAX		16
+
+typedef struct gci_gpio_item {
+	void			*arg;
+	uint8			gci_gpio;
+	uint8			status;
+	gci_gpio_handler_t	handler;
+	struct gci_gpio_item	*next;
+} gci_gpio_item_t;
+
+
+typedef struct si_cores_info {
+	void	*regs[SI_MAXCORES];	/* other regs va */
+
+	uint	coreid[SI_MAXCORES];	/* id of each core */
+	uint32	coresba[SI_MAXCORES];	/* backplane address of each core */
+	void	*regs2[SI_MAXCORES];	/* va of each core second register set (usbh20) */
+	uint32	coresba2[SI_MAXCORES];	/* address of each core second register set (usbh20) */
+	uint32	coresba_size[SI_MAXCORES]; /* backplane address space size */
+	uint32	coresba2_size[SI_MAXCORES]; /* second address space size */
+
+	void	*wrappers[SI_MAXCORES];	/* other cores wrapper va */
+	uint32	wrapba[SI_MAXCORES];	/* address of controlling wrapper */
+
+	uint32	cia[SI_MAXCORES];	/* erom cia entry for each core */
+	uint32	cib[SI_MAXCORES];	/* erom cia entry for each core */
+} si_cores_info_t;
 
 /* misc si info needed by some of the routines */
 typedef struct si_info {
@@ -71,27 +103,20 @@ typedef struct si_info {
 	uint varsz;
 
 	void	*curmap;		/* current regs va */
-	void	*regs[SI_MAXCORES];	/* other regs va */
 
 	uint	curidx;			/* current core index */
 	uint	numcores;		/* # discovered cores */
-	uint	coreid[SI_MAXCORES];	/* id of each core */
-	uint32	coresba[SI_MAXCORES];	/* backplane address of each core */
-	void	*regs2[SI_MAXCORES];	/* va of each core second register set (usbh20) */
-	uint32	coresba2[SI_MAXCORES];	/* address of each core second register set (usbh20) */
-	uint32	coresba_size[SI_MAXCORES]; /* backplane address space size */
-	uint32	coresba2_size[SI_MAXCORES]; /* second address space size */
 
 	void	*curwrap;		/* current wrapper va */
-	void	*wrappers[SI_MAXCORES];	/* other cores wrapper va */
-	uint32	wrapba[SI_MAXCORES];	/* address of controlling wrapper */
 
-	uint32	cia[SI_MAXCORES];	/* erom cia entry for each core */
-	uint32	cib[SI_MAXCORES];	/* erom cia entry for each core */
 	uint32	oob_router;		/* oob router registers for axi */
+
+	void *cores_info;
+	gci_gpio_item_t	*gci_gpio_head;	/* gci gpio interrupts head */
 } si_info_t;
 
-#define	SI_INFO(sih)	(si_info_t *)(uintptr)sih
+
+#define	SI_INFO(sih)	((si_info_t *)(uintptr)sih)
 
 #define	GOODCOREADDR(x, b) (((x) >= (b)) && ((x) < ((b) + SI_MAXCORES * SI_CORE_SIZE)) && \
 		ISALIGNED((x), SI_CORE_SIZE))
@@ -102,15 +127,21 @@ typedef struct si_info {
 
 #define PCI(si)		((BUSTYPE((si)->pub.bustype) == PCI_BUS) &&	\
 			 ((si)->pub.buscoretype == PCI_CORE_ID))
-#define PCIE(si)	((BUSTYPE((si)->pub.bustype) == PCI_BUS) &&	\
+
+#define PCIE_GEN1(si)	((BUSTYPE((si)->pub.bustype) == PCI_BUS) &&	\
 			 ((si)->pub.buscoretype == PCIE_CORE_ID))
+
+#define PCIE_GEN2(si)	((BUSTYPE((si)->pub.bustype) == PCI_BUS) &&	\
+			 ((si)->pub.buscoretype == PCIE2_CORE_ID))
+
+#define PCIE(si)	(PCIE_GEN1(si) || PCIE_GEN2(si))
+
 #define PCMCIA(si)	((BUSTYPE((si)->pub.bustype) == PCMCIA_BUS) && ((si)->memseg == TRUE))
 
 /* Newer chips can access PCI/PCIE and CC core without requiring to change
  * PCI BAR0 WIN
  */
-#define SI_FAST(si) (((si)->pub.buscoretype == PCIE_CORE_ID) ||	\
-		     (((si)->pub.buscoretype == PCI_CORE_ID) && (si)->pub.buscorerev >= 13))
+#define SI_FAST(si) (PCIE(si) || (PCI(si) && ((si)->pub.buscorerev >= 13)))
 
 #define PCIEREGS(si) (((char *)((si)->curmap) + PCI_16KB0_PCIREGS_OFFSET))
 #define CCREGS_FAST(si) (((char *)((si)->curmap) + PCI_16KB0_CCREGS_OFFSET))
@@ -120,10 +151,10 @@ typedef struct si_info {
  * after core switching to avoid invalid register accesss inside ISR.
  */
 #define INTR_OFF(si, intr_val) \
-	if ((si)->intrsoff_fn && (si)->coreid[(si)->curidx] == (si)->dev_coreid) {	\
+	if ((si)->intrsoff_fn && (cores_info)->coreid[(si)->curidx] == (si)->dev_coreid) {	\
 		intr_val = (*(si)->intrsoff_fn)((si)->intr_arg); }
 #define INTR_RESTORE(si, intr_val) \
-	if ((si)->intrsrestore_fn && (si)->coreid[(si)->curidx] == (si)->dev_coreid) {	\
+	if ((si)->intrsrestore_fn && (cores_info)->coreid[(si)->curidx] == (si)->dev_coreid) {	\
 		(*(si)->intrsrestore_fn)((si)->intr_arg, intr_val); }
 
 /* dynamic clock control defines */
@@ -137,10 +168,12 @@ typedef struct si_info {
 #define	ILP_DIV_5MHZ		0		/* ILP = 5 MHz */
 #define	ILP_DIV_1MHZ		4		/* ILP = 1 MHz */
 
+/* Force fast clock for 4360b0 */
 #define PCI_FORCEHT(si)	\
-	(((PCIE(si)) && (si->pub.chip == BCM4311_CHIP_ID) && ((si->pub.chiprev <= 1))) || \
-	((PCI(si) || PCIE(si)) && (si->pub.chip == BCM4321_CHIP_ID)) || \
-	(PCIE(si) && (si->pub.chip == BCM4716_CHIP_ID)))
+	(((PCIE_GEN1(si)) && (si->pub.chip == BCM4311_CHIP_ID) && ((si->pub.chiprev <= 1))) || \
+	((PCI(si) || PCIE_GEN1(si)) && (si->pub.chip == BCM4321_CHIP_ID)) || \
+	(PCIE_GEN1(si) && (si->pub.chip == BCM4716_CHIP_ID)) || \
+	(PCIE_GEN1(si) && (si->pub.chip == BCM4748_CHIP_ID)))
 
 /* GPIO Based LED powersave defines */
 #define DEFAULT_GPIO_ONTIME	10		/* Default: 10% on */
@@ -159,6 +192,7 @@ extern void sb_setint(si_t *sih, int siflag);
 extern uint sb_corevendor(si_t *sih);
 extern uint sb_corerev(si_t *sih);
 extern uint sb_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val);
+extern uint32 *sb_corereg_addr(si_t *sih, uint coreidx, uint regoff);
 extern bool sb_iscoreup(si_t *sih);
 extern void *sb_setcoreidx(si_t *sih, uint coreidx);
 extern uint32 sb_core_cflags(si_t *sih, uint32 mask, uint32 val);
@@ -193,10 +227,12 @@ extern si_t *ai_kattach(osl_t *osh);
 extern void ai_scan(si_t *sih, void *regs, uint devid);
 
 extern uint ai_flag(si_t *sih);
+extern uint ai_flag_alt(si_t *sih);
 extern void ai_setint(si_t *sih, int siflag);
 extern uint ai_coreidx(si_t *sih);
 extern uint ai_corevendor(si_t *sih);
 extern uint ai_corerev(si_t *sih);
+extern uint32 *ai_corereg_addr(si_t *sih, uint coreidx, uint regoff);
 extern bool ai_iscoreup(si_t *sih);
 extern void *ai_setcoreidx(si_t *sih, uint coreidx);
 extern uint32 ai_core_cflags(si_t *sih, uint32 mask, uint32 val);
@@ -208,6 +244,7 @@ extern void ai_core_disable(si_t *sih, uint32 bits);
 extern int ai_numaddrspaces(si_t *sih);
 extern uint32 ai_addrspace(si_t *sih, uint asidx);
 extern uint32 ai_addrspacesize(si_t *sih, uint asidx);
+extern void ai_coreaddrspaceX(si_t *sih, uint asidx, uint32 *addr, uint32 *size);
 extern uint ai_wrap_reg(si_t *sih, uint32 offset, uint32 mask, uint32 val);
 
 

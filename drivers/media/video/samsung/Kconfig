@@ -1,0 +1,225 @@
+menuconfig MALI_400MP_UMP
+	tristate "Mali-400 support"
+	default y
+	depends on VIDEO_SAMSUNG
+	help
+	  Enable this option to build support for the ARM Mali-400 GPU.
+	  This enables MALI and UMP integration in the multimedia device driver
+
+if MALI_VER_BEFORE_R3P2
+choice
+depends on MALI_400MP_UMP
+prompt "MALI MEMORY OPTION"
+default MALI_OSMEM_ONLY
+config MALI_DED_ONLY
+	bool "mali dedicated memory only"
+	help
+	  This enables MALI dedicated memory only option
+config MALI_DED_MMU
+	bool "mali dedicated memory with mmu enable"
+	help
+	  This enables MALI dedicated memory with mmu enable option
+config MALI_OSMEM_ONLY
+	bool "mali OS memory only"
+	help
+	  This enables MALI OS memory only option
+config MALI_DED_OSMEM
+	bool "mali dedicated memory and OS memory"
+	help
+	  This enables MALI dedicated memory and OS memory option
+endchoice
+
+config MALI_MEM_SIZE
+	int "Dedicated Memory Size"
+	depends on MALI_400MP_UMP && (MALI_DED_ONLY || MALI_DED_MMU || MALI_DED_OSMEM)
+	default "128"
+	help
+	  This value is dedicated memory size of Mali GPU(unit is MByte).
+
+# For UMP
+config UMP_VCM_ALLOC
+	bool "Enable ump-vcm(virtual contiguous memory) memory"
+	depends on MALI_400MP_UMP && VCM
+	default y
+	help
+	  Use VCM(virtual-contiguous-memory) to allocate physical memory.
+
+choice
+depends on MALI_400MP_UMP
+prompt "UMP MEMEMORY OPTION"
+default UMP_OSMEM_ONLY
+config UMP_DED_ONLY
+	bool "ump dedicated memory only"
+	help
+	  This enables UMP dedicated memory only option
+config UMP_OSMEM_ONLY
+	bool "ump OS memory only"
+	help
+	  This enables UMP OS memory only option
+config UMP_VCM_ONLY
+	bool "ump VCM memory"
+	help
+	  This enables UMP VCM memory only option
+endchoice
+
+config UMP_MEM_SIZE
+	int "UMP Memory Size"
+	depends on MALI_400MP_UMP
+	default "512"
+	help
+	  This value is dedicated memory size of UMP (unit is MByte).
+
+choice
+depends on MALI_400MP_UMP
+prompt "Select MALI Version"
+default MALI_UMP_R3P1
+config MALI_UMP_R2P4
+	bool "Uses the R2P4 kernel module"
+	help
+	  This uses the r2p4 as a UMP and MALI kernel module
+config MALI_UMP_R3P1
+	bool "Uses the R3P1 kernel module"
+	help
+	  This uses the r3p1 as a UMP and MALI kernel module
+endchoice
+
+# For MALI_UMP_DEBUG
+config MALI_400MP_UMP_DEBUG
+	bool "Enables mali and ump debug messages"
+	depends on MALI_400MP_UMP
+	default n
+	help
+	  This enables Mali and UMP driver debug messages.
+
+config MALI_400MP_UMP_STREAMLINE_PROFILING
+	bool "Enables mali streamline profiling"
+	depends on MALI_400MP_UMP
+	default n
+	help
+	  This enables Mali streamline profiling.
+
+config MALI_400MP_UMP_DVFS
+	bool "Enables DVFS"
+	depends on MALI_400MP_UMP && PM
+	default y
+	help
+	  This enables Mali driver DVFS.
+endif
+
+if CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412
+	source "drivers/media/video/samsung/fimc/Kconfig"
+	source "drivers/media/video/samsung/tvout/Kconfig"
+	source "drivers/media/video/samsung/mfc5x/Kconfig"
+	source "drivers/media/video/samsung/tsi/Kconfig"
+endif
+
+config VIDEO_SAMSUNG
+	bool "Samsung Multimedia Devices"
+	depends on VIDEO_CAPTURE_DRIVERS && VIDEO_V4L2
+	select VIDEO_FIXED_MINOR_RANGES
+	default n
+	help
+	  This is a representative video4linux configuration for Samsung multimedia devices.
+
+config VIDEO_SAMSUNG_V4L2
+	bool "V4L2 API for digital camera to be contributed by samsung"
+	depends on VIDEO_DEV && VIDEO_SAMSUNG
+	default n
+	help
+	  This feature is for new V4L2 APIs all about digital camera
+
+config VIDEO_FIMG2D
+	bool
+	depends on VIDEO_SAMSUNG
+	default n
+
+config VIDEO_FIMG2D_DEBUG
+	bool
+	depends on VIDEO_FIMG2D
+	default n
+
+if ARCH_EXYNOS5
+source "drivers/media/video/samsung/fimg2d3x/Kconfig"
+source "drivers/media/video/samsung/fimg2d4x/Kconfig"
+endif
+
+if ARCH_EXYNOS4
+source "drivers/media/video/samsung/fimg2d3x-exynos4/Kconfig"
+source "drivers/media/video/samsung/fimg2d4x-exynos4/Kconfig"
+endif
+
+
+if CPU_EXYNOS4210
+	source "drivers/media/video/samsung/jpeg/Kconfig"
+endif
+
+if CPU_EXYNOS4212 || CPU_EXYNOS4412 || CPU_EXYNOS5250
+	source "drivers/media/video/samsung/jpeg_v2x/Kconfig"
+endif
+
+if VIDEO_SAMSUNG
+comment "Reserved memory configurations"
+config VIDEO_SAMSUNG_USE_DMA_MEM
+	bool "Use common contigouse dma memory for Multimedia devices"
+	depends on SLP
+
+config VIDEO_SAMSUNG_MEMSIZE_DMA
+	int "Memory size in kbytes for DMA"
+	depends on VIDEO_SAMSUNG_USE_DMA_MEM
+	default "5120"
+
+config VIDEO_SAMSUNG_MEMSIZE_FIMC0
+	int "Memory size in kbytes for FIMC0"
+	depends on VIDEO_FIMC || VIDEO_SAMSUNG_S5P_FIMC
+	default "5120"
+
+config VIDEO_SAMSUNG_MEMSIZE_FIMC1
+	int "Memory size in kbytes for FIMC1"
+	depends on VIDEO_FIMC || VIDEO_SAMSUNG_S5P_FIMC
+	default "5120"
+
+config VIDEO_SAMSUNG_MEMSIZE_FIMC2
+	int "Memory size in kbytes for FIMC2"
+	depends on VIDEO_FIMC || VIDEO_SAMSUNG_S5P_FIMC
+	default "5120"
+
+config VIDEO_SAMSUNG_MEMSIZE_FIMC3
+	int "Memory size in kbytes for FIMC3"
+	depends on VIDEO_FIMC || VIDEO_SAMSUNG_S5P_FIMC
+	default "0"
+
+config VIDEO_SAMSUNG_MEMSIZE_MFC
+	int "Memory size in kbytes for MFC"
+	depends on VIDEO_MFC5X && (VIDEO_MFC_MEM_PORT_COUNT = 1) && (!EXYNOS_CONTENT_PATH_PROTECTION)
+	default "65536"
+
+config VIDEO_SAMSUNG_MEMSIZE_MFC0
+	int "Memory size in kbytes for MFC port0"
+	depends on VIDEO_MFC5X && (VIDEO_MFC_MEM_PORT_COUNT = 2) && (!EXYNOS_CONTENT_PATH_PROTECTION)
+	default "41984"
+
+config VIDEO_SAMSUNG_MEMSIZE_MFC1
+	int "Memory size in kbytes for MFC port1"
+	depends on VIDEO_MFC5X && (VIDEO_MFC_MEM_PORT_COUNT = 2) && (!EXYNOS_CONTENT_PATH_PROTECTION)
+	default "41984"
+
+config VIDEO_SAMSUNG_MEMSIZE_MFC_SECURE
+	int "Memory size in kbytes for MFC Secure"
+	depends on VIDEO_MFC5X && EXYNOS_CONTENT_PATH_PROTECTION
+	default "41984"
+
+config VIDEO_SAMSUNG_MEMSIZE_MFC_NORMAL
+	int "Memory size in kbytes for MFC Normal"
+	depends on VIDEO_MFC5X && EXYNOS_CONTENT_PATH_PROTECTION
+	default "41984"
+
+config VIDEO_SAMSUNG_MEMSIZE_JPEG
+	int "Memory size in kbytes for JPEG"
+	depends on VIDEO_JPEG || (VIDEO_JPEG_V2X && (CPU_EXYNOS4212 || CPU_EXYNOS4412))
+	default "40960"
+
+config VIDEO_SAMSUNG_MEMSIZE_TVOUT
+	int "Memory size in kbytes for TVOUT"
+	depends on VIDEO_TVOUT
+	default "16384"
+endif

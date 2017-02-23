@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/cpu.h>
+#include <linux/hardirq.h>
 #include <linux/kernel.h>
 #include <linux/notifier.h>
 #include <linux/signal.h>
@@ -395,8 +396,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
 
 static void vfp_enable(void *unused)
 {
-	u32 access = get_copro_access();
+	u32 access;
 
+	BUG_ON(preemptible());
+	access = get_copro_access();
 	/*
 	 * Enable full access to VFP (cp10 and cp11)
 	 */
@@ -494,8 +497,8 @@ void vfp_flush_hwstate(struct thread_info *thread)
 		 * Set the context to NULL to force a reload the next time
 		 * the thread uses the VFP.
 		 */
-		vfp_current_hw_state[cpu] = NULL;
 	}
+	vfp_current_hw_state[cpu] = NULL;
 
 #ifdef CONFIG_SMP
 	/*
@@ -541,7 +544,7 @@ static int __init vfp_init(void)
 	unsigned int cpu_arch = cpu_architecture();
 
 	if (cpu_arch >= CPU_ARCH_ARMv6)
-		vfp_enable(NULL);
+		on_each_cpu(vfp_enable, NULL, 1);
 
 	/*
 	 * First check that there is a VFP that we can use.
@@ -561,8 +564,6 @@ static int __init vfp_init(void)
 		printk("no double precision support\n");
 	} else {
 		hotcpu_notifier(vfp_hotplug, 0);
-
-		smp_call_function(vfp_enable, NULL, 1);
 
 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
 		printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
@@ -594,7 +595,6 @@ static int __init vfp_init(void)
 				elf_hwcap |= HWCAP_VFPv3D16;
 		}
 #endif
-#ifdef CONFIG_NEON
 		/*
 		 * Check for the presence of the Advanced SIMD
 		 * load/store instructions, integer and single
@@ -602,10 +602,13 @@ static int __init vfp_init(void)
 		 * for NEON if the hardware has the MVFR registers.
 		 */
 		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+#ifdef CONFIG_NEON
 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
 				elf_hwcap |= HWCAP_NEON;
-		}
 #endif
+			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
+				elf_hwcap |= HWCAP_VFPv4;
+		}
 	}
 	return 0;
 }

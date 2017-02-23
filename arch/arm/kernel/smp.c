@@ -40,6 +40,8 @@
 #include <asm/ptrace.h>
 #include <asm/localtimer.h>
 
+#include <mach/sec_debug.h>
+
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
  * so we need some other way of telling a new secondary core
@@ -61,6 +63,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
 	struct task_struct *idle = ci->idle;
 	pgd_t *pgd;
+#if defined(CONFIG_MACH_Q1_BD)
+	static pgd_t *s_pgd[CONFIG_NR_CPUS];
+#endif
 	int ret;
 
 	/*
@@ -88,7 +93,12 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	 * of our "standard" page tables, with the addition of
 	 * a 1:1 mapping for the physical address of the kernel.
 	 */
+#if defined(CONFIG_MACH_Q1_BD)
+	s_pgd[cpu] = s_pgd[cpu] ?: pgd_alloc(&init_mm);
+	pgd = s_pgd[cpu];
+#else
 	pgd = pgd_alloc(&init_mm);
+#endif
 	if (!pgd)
 		return -ENOMEM;
 
@@ -149,7 +159,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
 		identity_mapping_del(pgd, __pa(_sdata), __pa(_edata));
 	}
 
+#if !defined(CONFIG_MACH_Q1_BD)
 	pgd_free(&init_mm, pgd);
+#endif
 
 	return ret;
 }
@@ -272,6 +284,20 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
 }
 
 /*
+ * Skip the secondary calibration on architectures sharing clock
+ * with primary cpu. Archs can use ARCH_SKIP_SECONDARY_CALIBRATE
+ * for this.
+ */
+static inline int skip_secondary_calibrate(void)
+{
+#ifdef CONFIG_ARCH_SKIP_SECONDARY_CALIBRATE
+	return 0;
+#else
+	return -ENXIO;
+#endif
+}
+
+/*
  * This is the secondary CPU boot entry.  We're using this CPUs
  * idle thread stack, but a set of temporary page tables.
  */
@@ -279,8 +305,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu = smp_processor_id();
-
-	printk("CPU%u: Booted secondary processor\n", cpu);
 
 	/*
 	 * All kernel threads share the same mm context; grab a
@@ -293,6 +317,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	enter_lazy_tlb(mm, current);
 	local_flush_tlb_all();
 
+	printk("CPU%u: Booted secondary processor\n", cpu);
+
 	cpu_init();
 	preempt_disable();
 	trace_hardirqs_off();
@@ -304,7 +330,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 
 	notify_cpu_starting(cpu);
 
-	calibrate_delay();
+	if (skip_secondary_calibrate())
+		calibrate_delay();
 
 	smp_store_cpu_info(cpu);
 
@@ -320,13 +347,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 */
 	percpu_timer_setup();
 
-	while (!cpu_active(cpu))
-		cpu_relax();
-
-	/*
-	 * cpu_active bit is set, so it's safe to enable interrupts
-	 * now.
-	 */
 	local_irq_enable();
 	local_fiq_enable();
 
@@ -450,9 +470,7 @@ static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
 static void ipi_timer(void)
 {
 	struct clock_event_device *evt = &__get_cpu_var(percpu_clockevent);
-	irq_enter();
 	evt->event_handler(evt);
-	irq_exit();
 }
 
 #ifdef CONFIG_LOCAL_TIMERS
@@ -463,8 +481,13 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
 
 	if (local_timer_ack()) {
 		__inc_irq_stat(cpu, local_timer_irqs);
+		sec_debug_irq_log(0, do_local_timer, 1);
+		irq_enter();
 		ipi_timer();
-	}
+		irq_exit();
+		sec_debug_irq_log(0, do_local_timer, 2);
+	} else
+		sec_debug_irq_log(0, do_local_timer, 3);
 
 	set_irq_regs(old_regs);
 }
@@ -556,6 +579,9 @@ static void ipi_cpu_stop(unsigned int cpu)
 	local_fiq_disable();
 	local_irq_disable();
 
+	flush_cache_all();
+	local_flush_tlb_all();
+
 	while (1)
 		cpu_relax();
 }
@@ -623,9 +649,13 @@ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
 	if (ipinr >= IPI_TIMER && ipinr < IPI_TIMER + NR_IPI)
 		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
 
+	sec_debug_irq_log(ipinr, do_IPI, 1);
+
 	switch (ipinr) {
 	case IPI_TIMER:
+		irq_enter();
 		ipi_timer();
+		irq_exit();
 		break;
 
 	case IPI_RESCHEDULE:
@@ -633,19 +663,31 @@ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
 		break;
 
 	case IPI_CALL_FUNC:
+		irq_enter();
 		generic_smp_call_function_interrupt();
+		irq_exit();
 		break;
 
 	case IPI_CALL_FUNC_SINGLE:
+		irq_enter();
 		generic_smp_call_function_single_interrupt();
+		irq_exit();
 		break;
 
 	case IPI_CPU_STOP:
+		irq_enter();
 		ipi_cpu_stop(cpu);
+		irq_exit();
 		break;
 
 	case IPI_CPU_BACKTRACE:
+#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M0)
+		irq_enter();
+#endif
 		ipi_cpu_backtrace(cpu, regs);
+#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M0)
+		irq_exit();
+#endif
 		break;
 
 	default:
@@ -653,6 +695,9 @@ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
 		       cpu, ipinr);
 		break;
 	}
+
+	sec_debug_irq_log(ipinr, do_IPI, 2);
+
 	set_irq_regs(old_regs);
 }
 
@@ -687,4 +732,14 @@ void smp_send_stop(void)
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
+}
+
+static void flush_all_cpu_cache(void *info)
+{
+	flush_cache_all();
+}
+
+void flush_all_cpu_caches(void)
+{
+	on_each_cpu(flush_all_cpu_cache, NULL, 1);
 }

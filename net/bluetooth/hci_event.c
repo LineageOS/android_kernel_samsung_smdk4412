@@ -1590,6 +1590,21 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 	if (!conn)
 		goto unlock;
 
+	/* SS_BLUETOOTH(gudam.ryu) 2012. 03. 02 - Fixed for opp sending fail,
+	if the devices were unpaired on the remote end */
+	if (ev->status == 0x06 && hdev->ssp_mode > 0 &&
+			conn->ssp_mode > 0) {
+		struct hci_cp_auth_requested cp;
+		hci_remove_link_key(hdev, &conn->dst);
+		cp.handle = cpu_to_le16(conn->handle);
+		hci_send_cmd(conn->hdev, HCI_OP_AUTH_REQUESTED,
+		sizeof(cp), &cp);
+		hci_dev_unlock(hdev);
+		BT_DBG("Pin or key missing !!!");
+		return;
+	}
+	/* SS_Bluetooth(gudam.ryu) End */
+
 	if (!ev->status) {
 		if (!(conn->ssp_mode > 0 && hdev->ssp_mode > 0) &&
 				test_bit(HCI_CONN_REAUTH_PEND,	&conn->pend)) {
@@ -1600,6 +1615,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 		}
 	} else {
 		mgmt_auth_failed(hdev->id, &conn->dst, ev->status);
+		conn->disc_timeout = HCI_DISCONN_TIMEOUT/200; /* 0.01 sec */
 	}
 
 	clear_bit(HCI_CONN_AUTH_PEND, &conn->pend);
@@ -2739,9 +2755,11 @@ static inline void hci_simple_pair_complete_evt(struct hci_dev *hdev, struct sk_
 	 * initiated the authentication. A traditional auth_complete
 	 * event gets always produced as initiator and is also mapped to
 	 * the mgmt_auth_failed event */
-	if (!test_bit(HCI_CONN_AUTH_PEND, &conn->pend) && ev->status != 0)
+	if (!test_bit(HCI_CONN_AUTH_PEND, &conn->pend) && ev->status != 0) {
 		mgmt_auth_failed(hdev->id, &conn->dst, ev->status);
-
+		conn->out = 1;
+		conn->disc_timeout = HCI_DISCONN_TIMEOUT/200; /* 0.01 sec */
+	}
 	hci_conn_put(conn);
 
 unlock:

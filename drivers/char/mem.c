@@ -34,6 +34,14 @@
 # include <linux/efi.h>
 #endif
 
+#ifdef CONFIG_S3C_MEM
+# include "s3c_mem.h"
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+#include <linux/cma.h>
+#include <linux/platform_device.h>
+#endif
+#endif
+
 static inline unsigned long size_inside_page(unsigned long start,
 					     unsigned long size)
 {
@@ -821,6 +829,39 @@ static const struct file_operations oldmem_fops = {
 };
 #endif
 
+#ifdef CONFIG_S3C_MEM
+extern int s3c_mem_mmap(struct file* filp, struct vm_area_struct *vma);
+extern long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+
+static const struct file_operations s3c_mem_fops = {
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+	.open = s3c_mem_open,
+	.release = s3c_mem_release,
+#endif
+	.unlocked_ioctl	= s3c_mem_ioctl,
+	.mmap   = s3c_mem_mmap,
+};
+
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+static struct backing_dev_info s3c_mem_cma_dev_bdi;
+#endif
+
+#endif
+
+#ifdef CONFIG_EXYNOS_MEM
+extern int exynos_mem_open(struct inode * inode, struct file *filp);
+extern int exynos_mem_release(struct inode * inode, struct file *filp);
+extern long exynos_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+extern int exynos_mem_mmap(struct file* filp, struct vm_area_struct *vma);
+
+static const struct file_operations exynos_mem_fops = {
+	.open		= exynos_mem_open,
+	.release	= exynos_mem_release,
+	.unlocked_ioctl	= exynos_mem_ioctl,
+	.mmap		= exynos_mem_mmap,
+};
+#endif
+
 static ssize_t kmsg_writev(struct kiocb *iocb, const struct iovec *iv,
 			   unsigned long count, loff_t pos)
 {
@@ -883,6 +924,19 @@ static const struct memdev {
 #ifdef CONFIG_CRASH_DUMP
 	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
+#ifdef CONFIG_S3C_MEM
+	    [13] = {
+		"s3c-mem", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
+			| S_IWOTH, &s3c_mem_fops
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+		 , &s3c_mem_cma_dev_bdi
+#endif
+		},
+#endif
+#ifdef CONFIG_EXYNOS_MEM
+	[14] = {"exynos-mem", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+				&exynos_mem_fops},
+#endif
 };
 
 static int memory_open(struct inode *inode, struct file *filp)
@@ -930,7 +984,9 @@ static int __init chr_dev_init(void)
 {
 	int minor;
 	int err;
-
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
+	struct device *dev;
+#endif
 	err = bdi_init(&zero_bdi);
 	if (err)
 		return err;
@@ -946,11 +1002,26 @@ static int __init chr_dev_init(void)
 	for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
 		if (!devlist[minor].name)
 			continue;
-		device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
+		dev = device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
 			      NULL, devlist[minor].name);
+
+		if (devlist[minor].dev_info == &s3c_mem_cma_dev_bdi)
+			devlist[minor].dev_info->dev = IS_ERR(dev) ? NULL : dev;
+
+#else
+		device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
+				    NULL, devlist[minor].name);
+
+#endif
+
 	}
 
 	return tty_init();
 }
 
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
+late_initcall(chr_dev_init);
+#else
 fs_initcall(chr_dev_init);
+#endif

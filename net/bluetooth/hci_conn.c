@@ -508,6 +508,7 @@ struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
 	struct hci_conn *acl;
 	struct hci_conn *sco;
 	struct hci_conn *le;
+	struct inquiry_entry *ie;
 
 	BT_DBG("%s dst %s", hdev->name, batostr(dst));
 
@@ -752,6 +753,34 @@ int hci_conn_switch_role(struct hci_conn *conn, __u8 role)
 	return 0;
 }
 EXPORT_SYMBOL(hci_conn_switch_role);
+
+/* BEGIN SS_BLUEZ_BT +kjh 2011.06.23 : */
+/* workaround for a2dp chopping in multi connection. */
+/* Change Policy */
+int hci_conn_change_policy(struct hci_conn *conn, __u8 policy)
+{
+	struct hci_cp_write_link_policy cp;
+	cp.handle = cpu_to_le16(conn->handle);
+	cp.policy = policy;
+	hci_send_cmd(conn->hdev, HCI_OP_WRITE_LINK_POLICY, sizeof(cp), &cp);
+
+	return 0;
+}
+EXPORT_SYMBOL(hci_conn_change_policy);
+
+/* Set Encrypt*/
+int hci_conn_set_encrypt(struct hci_conn *conn, __u8 enable)
+{
+	struct hci_cp_set_conn_encrypt cp;
+	cp.handle  = cpu_to_le16(conn->handle);
+	cp.encrypt = enable;
+	hci_send_cmd(conn->hdev, HCI_OP_SET_CONN_ENCRYPT, sizeof(cp), &cp);
+
+	return 0;
+}
+EXPORT_SYMBOL(hci_conn_set_encrypt);
+/* END SS_BLUEZ_BT */
+
 
 /* Enter active mode */
 void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active)

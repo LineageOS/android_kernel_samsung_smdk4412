@@ -13,7 +13,12 @@
 #define EVDEV_MINOR_BASE	64
 #define EVDEV_MINORS		32
 #define EVDEV_MIN_BUFFER_SIZE	64U
+
+#ifdef CONFIG_INPUT_WACOM
+#define EVDEV_BUF_PACKETS	32
+#else
 #define EVDEV_BUF_PACKETS	8
+#endif
 
 #include <linux/poll.h>
 #include <linux/sched.h>
