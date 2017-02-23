@@ -1795,14 +1795,12 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
 
 #if !defined(CONFIG_MFD_MUIC_ADD_PLATFORM_DEVICE)
 #ifdef CONFIG_MFD_MAX77693
-#if defined(CONFIG_MUIC_I2C_USE_S3C_DEV_I2C4)
 static struct i2c_board_info i2c_devs4_max77693[] __initdata = {
 	{
 		I2C_BOARD_INFO("max77693", (0xCC >> 1)),
 		.platform_data	= &exynos4_max77693_info,
 	}
 };
-#endif /* CONFIG_MUIC_I2C_USE_S3C_DEV_I2C4 */
 #endif
 #endif /* !CONFIG_MFD_MUIC_ADD_PLATFORM_DEVICE */
 
