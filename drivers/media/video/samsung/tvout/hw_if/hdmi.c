@@ -2115,6 +2115,7 @@ void s5p_hdmi_reg_hpd_gen(void)
 #endif
 }
 
+#ifdef CONFIG_HDMI_14A_3D
 void s5p_hdmi_reg_hpd_deglitch(bool on, u32 threshold)
 {
 	if (on) {
@@ -2126,6 +2127,9 @@ void s5p_hdmi_reg_hpd_deglitch(bool on, u32 threshold)
 	}
 
 }
+#else
+void s5p_hdmi_reg_hpd_deglitch(bool on, u32 threshold) {}
+#endif
 
 int s5p_hdmi_reg_intc_set_isr(irqreturn_t (*isr)(int, void *), u8 num)
 {
