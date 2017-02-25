@@ -1409,6 +1409,17 @@ int fimc_g_ext_ctrls_capture(void *fh, struct v4l2_ext_controls *c)
 	return ret;
 }
 
+int fimc_noti_ctrl_capture(void *fh, struct v4l2_noti_control *c)
+{
+	struct fimc_control *ctrl = fh;
+	int ret = 0;
+
+	if (ctrl->cam->sd)
+		ret = subdev_call(ctrl, core, noti_ctrl, c);
+
+	return ret;
+}
+
 int fimc_s_ctrl_capture(void *fh, struct v4l2_control *c)
 {
 	struct fimc_control *ctrl = fh;
