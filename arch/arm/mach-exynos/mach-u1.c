@@ -78,7 +78,7 @@
 #include <plat/sdhci.h>
 #include <plat/mshci.h>
 #include <plat/iic.h>
-#include <plat/sysmmu.h>
+#include <plat/s5p-sysmmu.h>
 #include <plat/pd.h>
 #include <plat/regs-fb-v4.h>
 #include <plat/media.h>
