@@ -28,6 +28,9 @@ endif
 ifeq ($(CONFIG_CPU_EXYNOS4412),y)
     TARGET_PLATFORM=pegasus-m400
 endif
+ifeq ($(CONFIG_CPU_EXYNOS4210),y)
+    TARGET_PLATFORM=pegasus-m400
+endif
 ifeq ($(CONFIG_SOC_EXYNOS3470),y)
     TARGET_PLATFORM=exynos4270
 endif
