@@ -1527,6 +1527,7 @@ static inline u32 wincon(u32 bits_per_pixel, u32 transp_length, u32 red_length)
 }
 #endif
 
+#ifdef CONFIG_BUSFREQ_OPP
 void s3c_fb_set_busfreq(struct s3cfb_global *fbdev, unsigned int num_of_win)
 {
 	if (num_of_win > S3C_FB_MAX_WIN)
@@ -1537,6 +1538,10 @@ void s3c_fb_set_busfreq(struct s3cfb_global *fbdev, unsigned int num_of_win)
 
 	dev_lock(fbdev->bus_dev, fbdev->dev, fb_busfreq_table[num_of_win]);
 }
+#else
+void s3c_fb_set_busfreq(struct s3cfb_global *fbdev, unsigned int num_of_win) {}
+#endif
+
 static void s3c_fd_fence_wait(struct s3cfb_global *fbdev, struct sync_fence *fence)
 {
 	int err = sync_fence_wait(fence, 1000);
