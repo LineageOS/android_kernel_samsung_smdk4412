@@ -464,8 +464,10 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 	mmc_claim_host(card->host);
 
 	host = card->host;
+#ifdef CONFIG_BUSFREQ_OPP
 	if (host->bus_dev && host->host_dev)
 		dev_lock(host->bus_dev, host->host_dev, 160160);
+#endif
 
 	if (idata->ic.is_acmd) {
 		err = mmc_app_cmd(card->host, card);
@@ -510,8 +512,10 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 
 cmd_rel_host:
 	mmc_release_host(card->host);
+#ifdef CONFIG_BUSFREQ_OPP
 	if (host->bus_dev && host->host_dev)
 		dev_unlock(host->bus_dev, host->host_dev);
+#endif
 
 cmd_done:
 	if (md)
@@ -2148,8 +2152,10 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	if (req && !mq->mqrq_prev->req) {
 		/* claim host only for the first request */
 		mmc_claim_host(card->host);
+#ifdef CONFIG_BUSFREQ_OPP
 		if (host->bus_dev && host->host_dev)
 			dev_lock(host->bus_dev, host->host_dev, 160160);
+#endif
 	}
 
 	ret = mmc_blk_part_switch(card, md);
@@ -2180,8 +2186,10 @@ out:
 	if (!req) {
 		/* release host only when there are no more requests */
 		mmc_release_host(card->host);
+#ifdef CONFIG_BUSFREQ_OPP
 		if (host->bus_dev && host->host_dev)
 			dev_unlock(host->bus_dev, host->host_dev);
+#endif
 	}
 	return ret;
 }
