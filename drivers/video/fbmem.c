@@ -1381,6 +1381,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	 * Ugh. This can be either the frame buffer mapping, or
 	 * if pgoff points past it, the mmio mapping.
 	 */
+	start = info->fix.smem_start;
+	len = info->fix.smem_len;
 
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 	if (!cma_is_registered_region(start, len)) {
