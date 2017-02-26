@@ -47,7 +47,7 @@ struct max77693_haptic_data {
 	bool running;
 };
 
-struct max77693_haptic_data *g_hap_data;
+struct max77693_haptic_data *g_hap_data = NULL;
 
 static void max77693_haptic_i2c(struct max77693_haptic_data *hap_data, bool en)
 {
@@ -272,9 +272,10 @@ static ssize_t pwm_value_show(struct device *dev,
 {
 
 	int count, pwm_val;
-	struct max77693_platform_data *pdata = dev_get_platdata(dev_get_drvdata(dev->parent));
+	if (!g_hap_data)
+		return -EAGAIN;
 
-	pwm_val = (pdata->haptic_data->duty - 18525) * 100 / 18525;
+	pwm_val = (g_hap_data->pdata->duty - 18525) * 100 / 18525;
 
 	count = sprintf(buf, "%lu\n", pwm_val);
 
@@ -286,7 +287,6 @@ static ssize_t pwm_value_store(struct device *dev,
 {
 	int pwm_duty;
 	int pwm_val = 0;
-	struct max77693_platform_data *pdata = dev_get_platdata(dev_get_drvdata(dev->parent));
 
 	if (kstrtoul(buf, 0, &pwm_val)) {
 		pr_err("%s: error parsing pwm_val", __func__);
@@ -301,7 +301,10 @@ static ssize_t pwm_value_store(struct device *dev,
 		pwm_duty = 18525;
 	}
 
-	pdata->haptic_data->duty = pwm_duty;
+	if (!g_hap_data)
+		return -EAGAIN;
+
+	g_hap_data->pdata->duty = pwm_duty;
 	return size;
 }
 
