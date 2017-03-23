@@ -307,6 +307,7 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 		else {
 			pr_info("%s: ramdump collection completed\n", __func__);
 			mdm_drv->mdm_ram_dump_status = 0;
+			panic("CP Crash %s", mdm_read_err_report());
 		}
 		complete(&mdm_ram_dumps);
 		break;
@@ -384,6 +385,12 @@ static void mdm_reconnect_fn(struct work_struct *work)
 {
 	pr_info("mdm: check 2nd enumeration\n");
 
+	if (mdm_drv->shutdown)
+		return;
+
+	if (get_qmicm_mode(rmnet_pm_dev))
+		return;
+
 	if (mdm_check_main_connect(rmnet_pm_dev))
 		return;
 
@@ -397,6 +404,10 @@ static void mdm_status_fn(struct work_struct *work)
 	int value = gpio_get_value(mdm_drv->mdm2ap_status_gpio);
 
 	pr_debug("%s: status:%d\n", __func__, value);
+
+	if (mdm_drv->shutdown)
+		return;
+
 	if (mdm_drv->mdm_ready && mdm_drv->ops->status_cb)
 		mdm_drv->ops->status_cb(mdm_drv, value);
 #ifdef CONFIG_MDM_HSIC_PM
@@ -606,6 +617,7 @@ static int mdm_reboot_notifier(struct notifier_block *this,
 	int soft_reset_direction =
 		mdm_drv->pdata->soft_reset_inverted ? 1 : 0;
 	mdm_drv->mdm_ready = 0;
+	mdm_drv->shutdown = 1;
 	mdm_disable_irqs();
 	notify_modem_fatal();
 	gpio_direction_output(mdm_drv->ap2mdm_soft_reset_gpio,
@@ -863,6 +875,7 @@ static void mdm_modem_initialize_data(struct platform_device  *pdev,
 	mdm_drv->pdata->modem_complete = sim_detect_complete;
 	mdm_drv->sim_shutdown_req = false;
 #endif
+	mdm_drv->shutdown = 0;
 }
 
 int mdm_common_create(struct platform_device  *pdev,
