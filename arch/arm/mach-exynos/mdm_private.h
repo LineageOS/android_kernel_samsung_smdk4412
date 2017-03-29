@@ -59,6 +59,7 @@ struct mdm_modem_drv {
 
 	bool sim_shutdown_req;
 	bool sim_irq;
+	bool shutdown;
 };
 
 int mdm_common_create(struct platform_device  *pdev,
