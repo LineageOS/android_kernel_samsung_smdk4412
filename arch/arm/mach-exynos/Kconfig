@@ -1818,6 +1818,7 @@ choice
 config QC_MODEM_M3
 	bool "M3 support QMI inteface over HSIC"
 	select MODEM_SUPPORT_QMI_INTERFACE
+	select MSM_SUBSYSTEM_RESTART
 	select USB_QCOM_DIAG_BRIDGE
 	select USB_QCOM_MDM_BRIDGE
 	select QC_MODEM_MDM9X15
