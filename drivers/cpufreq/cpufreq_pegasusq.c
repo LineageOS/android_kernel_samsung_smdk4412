@@ -164,8 +164,13 @@ static unsigned int get_nr_run_avg(void)
 #define DEF_FREQ_STEP				(37)
 #define DEF_START_DELAY				(0)
 
+#ifdef CONFIG_CPU_EXYNOS4210
+#define UP_THRESHOLD_AT_MIN_FREQ		(40)
+#define FREQ_FOR_RESPONSIVENESS			(200000)
+#else
 #define UP_THRESHOLD_AT_MIN_FREQ		(40)
 #define FREQ_FOR_RESPONSIVENESS			(500000)
+#endif
 
 #define HOTPLUG_DOWN_INDEX			(0)
 #define HOTPLUG_UP_INDEX			(1)
@@ -181,14 +186,14 @@ static int hotplug_freq[4][2] = {
 	{200000, 500000},
 	{200000, 0}
 };
-#elif CONFIG_MACH_SMDK4210
+#elif CONFIG_CPU_EXYNOS4210
 static int hotplug_rq[2][2] = {
-	{0, 100}, {100, 0}
+	{0, 150}, {150, 0}
 };
 
 static int hotplug_freq[2][2] = {
-	{0, 500000},
-	{200000, 0}
+	{0, 600000},
+	{400000, 0}
 };
 #else
 static int hotplug_rq[4][2] = {
