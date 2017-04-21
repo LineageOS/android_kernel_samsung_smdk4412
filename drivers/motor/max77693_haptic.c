@@ -2,8 +2,6 @@
  * haptic motor driver for max77693 - max77673_haptic.c
  *
  * Copyright (C) 2011 ByungChang Cha <bc.cha@samsung.com>
- * Copyright (C) 2012 The CyanogenMod Project
- *                    Daniel Hillenbrand <codeworkx@cyanogenmod.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,13 +22,12 @@
 #include <linux/mfd/max77693.h>
 #include <linux/mfd/max77693-private.h>
 
-#define PWM_MIN 0
-#define PWM_DEFAULT 50
-#define PWM_THRESH 75
-#define PWM_MAX 100
-
-static unsigned long pwm_val = 50; /* duty in percent */
-static int pwm_duty = 27787; /* duty value, 37050=100%, 27787=50%, 18525=0% */
+#include <linux/init.h>
+#include <linux/device.h>
+#include <linux/miscdevice.h>
+static bool vibrator_control_enable=false;
+static int intensity=127;
+#define SEC_DEBUG_VIB
 
 struct max77693_haptic_data {
 	struct max77693_dev *max77693;
@@ -152,7 +149,13 @@ err_clk_get:
 	clk_put(vibetonz_clk);
 	return -EINVAL;
 }
-
+/*
+###############################################################################
+#	
+#	AOSP Based ROM - Vibration Intensity Contorl
+#
+###############################################################################
+*/
 static void haptic_work(struct work_struct *work)
 {
 	struct max77693_haptic_data *hap_data
@@ -164,9 +167,28 @@ static void haptic_work(struct work_struct *work)
 			return;
 
 		max77693_haptic_i2c(hap_data, true);
-
-		pwm_config(hap_data->pwm, pwm_duty, hap_data->pdata->period);
-        pr_info("[VIB] %s: pwm_config duty=%d\n", __func__, pwm_duty);
+		if (vibrator_control_enable)
+		{
+			int pwm_period = 0, pwm_duty = 0;
+			pwm_period = g_hap_data->pdata->period;
+				pwm_duty = pwm_period / 2 + ((pwm_period / 2 - 2) * intensity) / 127;
+		#ifdef SEC_DEBUG_VIB
+				printk(KERN_DEBUG "**************************************************");
+				printk(KERN_DEBUG "[VIB] vibtonz_pwm_period is called(127)\n");
+			    printk(KERN_DEBUG "[VIB] Intensity is called(%d)\n", intensity);
+		#endif
+			hap_data->pdata->duty=pwm_duty;
+			pwm_config(hap_data->pwm, hap_data->pdata->duty, hap_data->pdata->period);
+		#ifdef SEC_DEBUG_VIB
+				printk(KERN_DEBUG "**************************************************");
+				printk(KERN_DEBUG "[VIB] hap_data->pdata->duty is called(%d)\n", hap_data->pdata->duty);
+				printk(KERN_DEBUG "[VIB] hap_data->pdata->period is called(%d)\n", hap_data->pdata->period);
+				printk(KERN_DEBUG "**************************************************");
+		#endif
+		} 
+		else
+			pwm_config(hap_data->pwm, hap_data->pdata->duty, hap_data->pdata->period);
+		
 		pwm_enable(hap_data->pwm);
 
 		if (hap_data->pdata->motor_en)
@@ -202,7 +224,7 @@ static void haptic_work(struct work_struct *work)
 void vibtonz_en(bool en)
 {
 	if (g_hap_data == NULL) {
-		pr_err("[VIB] %s: the motor is not ready!!!", __func__);
+		printk(KERN_ERR "[VIB] the motor is not ready!!!");
 		return ;
 	}
 
@@ -240,107 +262,60 @@ void vibtonz_en(bool en)
 }
 EXPORT_SYMBOL(vibtonz_en);
 
+/*
+###############################################################################
+#	
+#	SAMSUNG TOUCHWIZ ROM - Vibration Intensity Contorl
+#
+###############################################################################
+*/
 void vibtonz_pwm(int nForce)
 {
 	/* add to avoid the glitch issue */
 	static int prev_duty;
-	int pwm_period = 0;
+	int pwm_period = 0, pwm_duty = 0;
 
 	if (g_hap_data == NULL) {
-		pr_err("[VIB] %s: the motor is not ready!!!", __func__);
+		printk(KERN_ERR "[VIB] the motor is not ready!!!");
 		return ;
 	}
+
+	pwm_period = g_hap_data->pdata->period;
+	if (vibrator_control_enable)
+	{
+		pwm_duty = pwm_period / 2 + ((pwm_period / 2 - 2) * nForce) / intensity;
+#ifdef SEC_DEBUG_VIB
+			printk(KERN_DEBUG "**************************************************");
+			printk(KERN_DEBUG "[VIB] vibtonz_pwm_period is called(%d)\n", intensity);
+#endif
+	}
+	else
+	{
+		pwm_duty = pwm_period / 2 + ((pwm_period / 2 - 2) * nForce) / 127;
+#ifdef SEC_DEBUG_VIB
+		printk(KERN_DEBUG "**************************************************");
+		printk(KERN_DEBUG "[VIB] vibtonz_pwm_period is called(127)\n");
+#endif
+	}
+	if (pwm_duty > g_hap_data->pdata->duty)
+		pwm_duty = g_hap_data->pdata->duty;
+	else if (pwm_period - pwm_duty > g_hap_data->pdata->duty)
+		pwm_duty = pwm_period - g_hap_data->pdata->duty;
 
 	/* add to avoid the glitch issue */
 	if (prev_duty != pwm_duty) {
 		prev_duty = pwm_duty;
-
-        pr_debug("[VIB] %s: setting pwm_duty=%d", __func__, pwm_duty);
 		pwm_config(g_hap_data->pwm, pwm_duty, pwm_period);
 	}
 #ifdef SEC_DEBUG_VIB
+	printk(KERN_DEBUG "[VIB] vibtonz_pwm_period is called(%d)\n", pwm_period);
+	printk(KERN_DEBUG "[VIB] vibtonz_pwm_duty is called(%d)\n", pwm_duty);
 	printk(KERN_DEBUG "[VIB] vibtonz_pwm is called(%d)\n", nForce);
+	printk(KERN_DEBUG "**************************************************");
 #endif
 }
 EXPORT_SYMBOL(vibtonz_pwm);
 #endif
-
-static ssize_t pwm_value_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	int count;
-
-	pwm_val = ((pwm_duty - 18525) * 100) / 18525;
-
-	count = sprintf(buf, "%lu\n", pwm_val);
-	pr_debug("[VIB] pwm_value: %lu\n", pwm_val);
-
-	return count;
-}
-
-ssize_t pwm_value_store(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t size)
-{
-	if (kstrtoul(buf, 0, &pwm_val))
-		pr_err("[VIB] %s: error on storing pwm_val\n", __func__); 
-
-	pr_info("[VIB] %s: pwm_value=%lu\n", __func__, pwm_val);
-
-	pwm_duty = (pwm_val * 18525) / 100 + 18525;
-
-	/* make sure new pwm duty is in range */
-	if(pwm_duty > 37050)
-	{
-		pwm_duty = 37050;
-	}
-	else if (pwm_duty < 18525)
-	{
-		pwm_duty = 18525;
-	}
-
-	pr_info("[VIB] %s: pwm_duty=%d\n", __func__, pwm_duty);
-
-	return size;
-}
-static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
-		pwm_value_show, pwm_value_store);
-
-static ssize_t pwm_default_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u\n", PWM_DEFAULT);
-}
-
-static DEVICE_ATTR(pwm_default, S_IRUGO,
-		pwm_default_show, NULL);
-
-static ssize_t pwm_max_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u\n", PWM_MAX);
-}
-
-static DEVICE_ATTR(pwm_max, S_IRUGO,
-		pwm_max_show, NULL);
-
-static ssize_t pwm_min_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u\n", PWM_MIN);
-}
-
-static DEVICE_ATTR(pwm_min, S_IRUGO,
-		pwm_min_show, NULL);
-
-static ssize_t pwm_threshold_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u\n", PWM_THRESH);
-}
-
-static DEVICE_ATTR(pwm_threshold, S_IRUGO,
-		pwm_threshold_show, NULL);
 
 static int max77693_haptic_probe(struct platform_device *pdev)
 {
@@ -411,32 +386,8 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 		error = -EFAULT;
 		goto err_timed_output_register;
 	}
-
-	pr_err("[VIB] timed_output device is registrated\n");
-
-	/* User controllable pwm level */
-	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_value);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_value\n");
-	}
-	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_max);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_max\n");
-	}
-	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_min);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_min\n");
-	}
-	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_default);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_default\n");
-	}
-	error = device_create_file(hap_data->tout_dev.dev, &dev_attr_pwm_threshold);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_threshold\n");
-	}
-
 #endif
+	printk(KERN_DEBUG "[VIB] timed_output device is registrated\n");
 	pr_debug("[VIB] -- %s\n", __func__);
 
 	return error;
@@ -481,7 +432,7 @@ static int max77693_haptic_resume(struct platform_device *pdev)
 static struct platform_driver max77693_haptic_driver = {
 	.probe		= max77693_haptic_probe,
 	.remove		= max77693_haptic_remove,
-	.suspend	= max77693_haptic_suspend,
+	.suspend		= max77693_haptic_suspend,
 	.resume		= max77693_haptic_resume,
 	.driver = {
 		.name	= "max77693-haptic",
@@ -500,8 +451,114 @@ static void __exit max77693_haptic_exit(void)
 {
 	platform_driver_unregister(&max77693_haptic_driver);
 }
-module_exit(max77693_haptic_exit);
 
+/*
+###############################################################################
+#
+# Vibrator Intesity Control - Sunho Kim(Str@wberry - WIDzard)
+# http://github.com/widz4rd/WIDzard_Kernel_E250_KK
+#													  2014-08-11
+###############################################################################
+
+*/
+static ssize_t vibration_status_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%u\n", (vibrator_control_enable ? 1 : 0));
+}
+
+static ssize_t vibration_status_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	unsigned int data;
+
+	if(sscanf(buf, "%u\n", &data) == 1) {
+		pr_devel("%s: %u \n", __FUNCTION__, data);
+
+		if (data == 1) {
+#ifdef SEC_DEBUG_VIB
+			pr_info("[VIBRATOR_CONTORL] %s: VIBRATOR_CONTROL function enabled\n", __FUNCTION__);
+#endif
+			vibrator_control_enable = true;
+		} else if (data == 0) {
+#ifdef SEC_DEBUG_VIB
+			pr_info("[VIBRATOR_CONTORL] %s: VIBRATOR_CONTROL function disabled\n", __FUNCTION__);
+#endif
+			vibrator_control_enable = false;
+#ifdef SEC_DEBUG_VIB
+		} else {
+			pr_info("[VIBRATOR_CONTORL] %s: invalid input range %u\n", __FUNCTION__, data);
+#endif
+		}
+#ifdef SEC_DEBUG_VIB
+	} else 	{
+		pr_info("[VIBRATOR_CONTORL] %s: invalid input\n", __FUNCTION__);
+#endif
+	}
+
+	return size;
+}
+static ssize_t vibration_intensity_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+	return sprintf(buf, "%d\n", intensity);
+}
+
+static ssize_t vibration_intensity_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+	int data;
+
+	sscanf(buf, "%d\n", &data);
+		intensity = data;
+	return size;
+}
+static DEVICE_ATTR(intensity, S_IRUGO | S_IWUSR, vibration_intensity_read, vibration_intensity_write);
+static DEVICE_ATTR(enabled, S_IRUGO | S_IWUSR, vibration_status_read, vibration_status_write);
+static struct attribute *vibration_intensity[] =
+{
+	&dev_attr_enabled.attr,
+	&dev_attr_intensity.attr,
+	NULL
+};
+static struct attribute_group vibration_intensity_group =
+{
+	.attrs	= vibration_intensity,
+};
+
+static struct miscdevice vibration_intensity_device =
+{
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "WIDzard_vibration",
+};
+static int __init vibration_intensity_control_init(void)
+{
+	int ret;
+
+	pr_info("%s misc_register(%s)\n", __FUNCTION__, vibration_intensity_device.name);
+	ret = misc_register(&vibration_intensity_device);
+
+	if (ret) {
+		pr_err("%s misc_register(%s) fail\n", __FUNCTION__, vibration_intensity_device.name);
+
+		return 1;
+	}
+
+	if (sysfs_create_group(&vibration_intensity_device.this_device->kobj, &vibration_intensity_group) < 0) {
+		pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
+		pr_err("Failed to create sysfs group for device (%s)!\n", vibration_intensity_device.name);
+	}
+
+	return 0;
+}
+
+device_initcall(vibration_intensity_control_init);
+/*
+###############################################################################
+#
+# Vibrator Intesity Contorl - SunhoKim(Str@wberry - WIDzard)
+# http://github.com/widz4rd/WIDzard_Kernel_E250_KK
+#													  2014-08-11
+###############################################################################
+
+*/
+module_exit(max77693_haptic_exit);
 MODULE_AUTHOR("ByungChang Cha <bc.cha@samsung.com>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MAX77693 haptic driver");
