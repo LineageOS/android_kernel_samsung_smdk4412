@@ -202,6 +202,9 @@ static bool blnww = false;
 static int led_fadein = 0, led_fadeout = 0;
 static int led_on_touch = 0;
 
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT224_U1
+extern void (*mxt224_touch_cb)(void);
+#endif
 #endif
 
 MODULE_DEVICE_TABLE(i2c, sec_touchkey_id);
@@ -2659,6 +2662,10 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 	reset_breathing_steps();
         /* wake lock for BLN */
         wake_lock_init(&bln_wake_lock, WAKE_LOCK_SUSPEND, "bln_wake_lock");
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT224_U1
+	mxt224_touch_cb = cypress_notify_touch;
+#endif
 #endif
 	return 0;
 }
