@@ -421,12 +421,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		return;
 	this_dbs_info->down_skip = 0;
 
-	/*
-	 * The optimal frequency is the frequency that is the lowest that
-	 * can support the current CPU usage without triggering the up
-	 * policy. To be safe, we focus 10 points under the threshold.
-	 */
-	if (max_load < (dbs_tuners_ins.down_threshold - 10)) {
+	/* Check for frequency decrease */
+	if (max_load < dbs_tuners_ins.down_threshold) {
 
 		/*
 		 * if we cannot reduce the frequency anymore, break out early
