@@ -339,8 +339,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	 * sampling_down_factor, we check, if current idle time is more than 80%
 	 * (default), then we try to decrease frequency
 	 *
-	 * Any frequency increase takes it to the maximum frequency. Frequency reduction
-	 * happens at minimum steps of 5% (default) of maximum frequency
+	 * Frequency updates happen at minimum steps of 5% (default) of maximum
+	 * frequency
 	 */
 
 	/* Get Absolute Load */
