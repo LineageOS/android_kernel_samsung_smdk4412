@@ -333,14 +333,13 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	policy = this_dbs_info->cur_policy;
 
 	/*
-	 * Every sampling_rate, we check, if current idle time is less
-	 * than 20% (default), then we try to increase frequency
-	 * Every sampling_rate*sampling_down_factor, we check, if current
-	 * idle time is more than 80%, then we try to decrease frequency
+	 * Every sampling_rate, we check, if current idle time is less than 20%
+	 * (default), then we try to increase frequency. Every sampling_rate *
+	 * sampling_down_factor, we check, if current idle time is more than 80%
+	 * (default), then we try to decrease frequency
 	 *
-	 * Any frequency increase takes it to the maximum frequency.
-	 * Frequency reduction happens at minimum steps of
-	 * 5% (default) of maximum frequency
+	 * Any frequency increase takes it to the maximum frequency. Frequency reduction
+	 * happens at minimum steps of 5% (default) of maximum frequency
 	 */
 
 	/* Get Absolute Load */
@@ -416,6 +415,11 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 			CPUFREQ_RELATION_H);
 		return;
 	}
+
+	/* if sampling_down_factor is active break out early */
+	if (++this_dbs_info->down_skip < dbs_tuners_ins.sampling_down_factor)
+		return;
+	this_dbs_info->down_skip = 0;
 
 	/*
 	 * The optimal frequency is the frequency that is the lowest that
