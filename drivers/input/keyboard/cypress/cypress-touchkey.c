@@ -133,6 +133,13 @@ static int touchkey_debug_count;
 static char touchkey_debug[104];
 
 #ifdef LED_LDO_WITH_REGULATOR
+
+#define BL_STANDARD	3000
+#define BL_MIN		2500
+#define BL_MAX		3300
+
+static unsigned int touchkey_voltage_brightness = BL_STANDARD;
+
 static void change_touch_key_led_voltage(int vol_mv)
 {
 	struct regulator *tled_regulator;
@@ -145,6 +152,17 @@ static void change_touch_key_led_voltage(int vol_mv)
 	}
 	regulator_set_voltage(tled_regulator, vol_mv * 1000, vol_mv * 1000);
 	regulator_put(tled_regulator);
+}
+
+void update_touchkey_brightness(unsigned int level)
+{
+	if (level > 0 && level < 256) {
+		printk(KERN_DEBUG "[TouchKey-LED] %s: %d\n", __func__, level);
+		touchkey_voltage_brightness = BL_MIN + ((((level * 100 / 255) * (BL_MAX - BL_MIN)) / 100) / 50) * 50;
+		change_touch_key_led_voltage(touchkey_voltage_brightness);
+	} else {
+		printk(KERN_DEBUG "[TouchKey-LED] %s: Ignoring brightness : %d\n", __func__, level);
+	}
 }
 
 static ssize_t brightness_control(struct device *dev,
@@ -925,6 +943,9 @@ static int sec_touchkey_late_resume(struct early_suspend *h)
 	i2c_touchkey_write(tkey_i2c->client, &get_touch, 1);
 #endif
 
+#ifdef LED_LDO_WITH_REGULATOR
+	change_touch_key_led_voltage(touchkey_voltage_brightness);
+#endif
 	enable_irq(tkey_i2c->irq);
 
 	return 0;
@@ -1086,6 +1107,12 @@ static ssize_t touchkey_led_control(struct device *dev,
 		return size;
 	}
 
+#ifdef LED_LDO_WITH_REGULATOR
+	if (data > 1 && touchkey_enable) {
+		update_touchkey_brightness(data);
+	}
+	data = data ? 1 : 0;
+#endif
 	if (data != 0 && data != 1) {
 		printk(KERN_DEBUG "[TouchKey] %s wrong cmd %x\n",
 			__func__, data);
