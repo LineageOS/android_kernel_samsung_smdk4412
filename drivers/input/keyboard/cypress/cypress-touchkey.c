@@ -127,7 +127,16 @@ static const struct i2c_device_id sec_touchkey_id[] = {
 
 #ifdef CONFIG_TOUCHKEY_BLN
 #include <linux/miscdevice.h>
+#include <linux/time.h>
+
 #define BLN_VERSION 9
+int notification_timeout = -1;
+long notification_start_sec;
+long notification_end_sec;
+
+static struct timer_list notification_timeout_timer;
+static void notification_off_process(struct work_struct *notification_off_work);
+static DECLARE_WORK(notification_off_work, notification_off_process);
 
 bool bln_enabled = false;
 bool bln_ongoing = false;
@@ -1884,6 +1893,15 @@ static void enable_led_notification(void) {
 			printk(KERN_DEBUG "[TouchKey-BLN] bln_ongoing set to true\n");
 			bln_ongoing = true;
 			enable_touchkey_backlights();
+
+			/* See if a timeout value has been set for the notification */
+			if (notification_timeout > 0) {
+				notification_end_sec = CURRENT_TIME.tv_sec + notification_timeout / 1000;
+				printk(KERN_DEBUG "[TouchKey-BLN] %s: Starting notification timeout (%d - %d)\n", __func__, CURRENT_TIME.tv_sec, notification_end_sec);
+
+				/* restart the timer */
+				mod_timer(&notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
+			}
 		}
 	}
 }
@@ -1899,6 +1917,12 @@ static void disable_led_notification(void) {
 		disable_touchkey_backlights();
 		if (bln_suspended) {
 			touchkey_deactivate();
+		}
+
+		/* A notification timeout was set, disable the timer */
+		if (notification_timeout > 0) {
+			printk(KERN_DEBUG "[TouchKey-BLN] %s: Stop notification timeout (%d)\n", __func__, notification_timeout/1000);
+			del_timer(&notification_timeout_timer);
 		}
 	}
 }
@@ -1985,16 +2009,33 @@ static ssize_t bln_version( struct device *dev, struct device_attribute *attr, c
         return sprintf(buf,"%u\n", BLN_VERSION);
 }
 
+static ssize_t notification_timeout_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %u\n", __func__, notification_timeout);
+
+	return sprintf(buf,"%d\n", notification_timeout);
+}
+
+static ssize_t notification_timeout_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %s\n", __func__, buf);
+
+	sscanf(buf,"%d\n", &notification_timeout);
+	return size;
+}
+
 static DEVICE_ATTR(blink_control, S_IRUGO | S_IWUGO, blink_control_read, blink_control_write );
 static DEVICE_ATTR(enabled, S_IRUGO | S_IWUGO, bln_status_read, bln_status_write );
 static DEVICE_ATTR(notification_led, S_IRUGO | S_IWUGO, notification_led_status_read,  notification_led_status_write );
 static DEVICE_ATTR(version, S_IRUGO, bln_version, NULL );
+static DEVICE_ATTR(notification_timeout, S_IRUGO | S_IWUGO, notification_timeout_read, notification_timeout_write);
 
 static struct attribute *bln_notification_attributes[] = {
         &dev_attr_blink_control.attr,
         &dev_attr_enabled.attr,
         &dev_attr_notification_led.attr,
         &dev_attr_version.attr,
+	&dev_attr_notification_timeout.attr,
         NULL
 };
 
@@ -2006,6 +2047,36 @@ static struct miscdevice bln_device = {
         .minor = MISC_DYNAMIC_MINOR,
         .name  = "backlightnotification",
 };
+
+static void notification_off_process(struct work_struct *work)
+{
+	printk(KERN_DEBUG "[TouchKey] %s\n", __func__);
+
+	/* do nothing if there is no active notification */
+	if (bln_ongoing != 1 || touchkey_enable != 1)
+		return;
+
+	notification_end_sec = 0;
+        disable_led_notification();
+	bln_ongoing = 0;
+}
+
+static void handle_notification_timeout_timer(unsigned long data)
+{
+	if (notification_timeout > 0 && bln_suspended) {
+		struct timespec spec = CURRENT_TIME;
+		printk(KERN_DEBUG "[TouchKey-BLN] %s: Timing out in %d seconds\n", __func__, notification_end_sec - spec.tv_sec);
+
+		if (spec.tv_sec > notification_end_sec) {
+			printk(KERN_DEBUG "[TouchKey-BLN] %s: Timed out at %d (scheduled: %d)\n", __func__, spec.tv_sec, notification_end_sec);
+
+			/* we cannot call the timeout directly as it causes a kernel spinlock BUG, schedule it instead */
+			schedule_work(&notification_off_work);
+			return;
+		}
+		mod_timer(&notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
+	}
+}
 
 #endif
 
@@ -2185,6 +2256,8 @@ static int i2c_touchkey_probe(struct i2c_client *client,
         /* BLN early suspend */
         register_early_suspend(&bln_suspend_data);
 
+	/* Setup the timer for the timeouts */
+	setup_timer(&notification_timeout_timer, handle_notification_timeout_timer, 0);
 #endif
 	return 0;
 }
