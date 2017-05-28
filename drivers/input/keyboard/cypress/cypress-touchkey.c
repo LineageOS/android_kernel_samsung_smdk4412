@@ -156,6 +156,28 @@ static bool bln_suspended = false;
 static DEFINE_MUTEX(led_notification_mutex);
 static void enable_led_notification(void);
 static void disable_led_notification(void);
+
+#ifdef LED_LDO_WITH_REGULATOR
+static struct timer_list bln_breathing_timer;
+static void bln_breathe_process(struct work_struct *bln_breathe_work);
+void bln_stop_breathing(void);
+static DECLARE_WORK(bln_breathe_work, bln_breathe_process);
+
+/* Breathing variables */
+#define MAX_BLN_BREATHING_STEPS 10
+static unsigned int bln_breathing = 0;
+static int bln_breathing_step_count = 0;
+struct bln_breathing_step {
+	int start; //mV
+	int end; //mV
+	int period; //ms
+	int step; //mV
+};
+struct bln_breathing_step bln_breathing_steps[MAX_BLN_BREATHING_STEPS];
+static int bln_breathing_idx = 0;
+static int bln_breathing_step_idx = 0;
+#endif
+
 #endif
 
 #ifdef LED_LDO_WITH_REGULATOR
@@ -1925,12 +1947,17 @@ static void enable_touchkey_backlights(void) {
 	}
 
 #ifdef LED_LDO_WITH_REGULATOR
-	if (led_fadein) {
-		led_fadein_process(NULL);
-		return;
+	if (bln_breathing) {
+		touchkey_voltage = BL_MIN;
+		change_touch_key_led_voltage(BL_MIN);
+	} else {
+		if (led_fadein) {
+			led_fadein_process(NULL);
+			return;
+		}
+		touchkey_voltage = touchkey_voltage_brightness;
+		change_touch_key_led_voltage(touchkey_voltage_brightness);
 	}
-	touchkey_voltage = touchkey_voltage_brightness;
-	change_touch_key_led_voltage(touchkey_voltage_brightness);
 #endif
 	touchkey_led_status = TK_CMD_LED_ON;
 	i2c_touchkey_write(bl_tkey_i2c->client, (u8 *)&touchkey_led_status, 1);
@@ -1948,6 +1975,9 @@ static void disable_touchkey_backlights(void) {
 	}
 
 #ifdef LED_LDO_WITH_REGULATOR
+	if (bln_breathing)
+		return;
+
 	if (led_fadeout) {
 		led_fadeout_process(NULL);
 		cancel_work_sync(&led_fadeout_work);
@@ -1983,6 +2013,9 @@ static void enable_led_notification(void) {
 			/* restart the timer */
 			mod_timer(&bln_notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
 		}
+#ifdef LED_LDO_WITH_REGULATOR
+		if (bln_breathing) mod_timer(&bln_breathing_timer, jiffies + 4);
+#endif
 	}
 	mutex_unlock(&led_notification_mutex);
 }
@@ -2006,6 +2039,9 @@ static void disable_led_notification(void) {
 				__func__, bln_notification_timeout/1000);
 			del_timer(&bln_notification_timeout_timer);
 		}
+#ifdef LED_LDO_WITH_REGULATOR
+		if (bln_breathing) bln_stop_breathing();
+#endif
 	}
 	mutex_unlock(&led_notification_mutex);
 }
@@ -2104,19 +2140,137 @@ static ssize_t bln_notification_timeout_write(struct device *dev,
 	return size;
 }
 
+#ifdef LED_LDO_WITH_REGULATOR
+static void bln_breathe_process(struct work_struct *work)
+{
+	int data;
+	if (bln_ongoing != 1 || touchkey_enable != 1)
+		return;
+
+	if (bln_breathing_steps[bln_breathing_step_idx].start <= bln_breathing_steps[bln_breathing_step_idx].end) {
+		data = bln_breathing_steps[bln_breathing_step_idx].start +
+			bln_breathing_idx++ * bln_breathing_steps[bln_breathing_step_idx].step;
+		if (data > bln_breathing_steps[bln_breathing_step_idx].end) {
+			bln_breathing_idx = 0;
+			bln_breathing_step_idx++;
+			if (bln_breathing_step_idx >= bln_breathing_step_count) bln_breathing_step_idx = 0;
+			data = bln_breathing_steps[bln_breathing_step_idx].start;
+		}
+	} else {
+		data = bln_breathing_steps[bln_breathing_step_idx].start -
+			bln_breathing_idx++ * bln_breathing_steps[bln_breathing_step_idx].step;
+		if (data < bln_breathing_steps[bln_breathing_step_idx].end) {
+			bln_breathing_idx = 0;
+			bln_breathing_step_idx++;
+			if (bln_breathing_step_idx >= bln_breathing_step_count) bln_breathing_step_idx = 0;
+			data = bln_breathing_steps[bln_breathing_step_idx].start;
+		}
+	}
+
+	touchkey_voltage = data;
+	change_touch_key_led_voltage(touchkey_voltage);
+	mod_timer(&bln_breathing_timer, jiffies + msecs_to_jiffies(bln_breathing_steps[bln_breathing_step_idx].period));
+}
+
+void bln_stop_breathing(void)
+{
+	printk(KERN_DEBUG "[TouchKey-BLN] %s\n", __func__);
+
+	del_timer(&bln_breathing_timer);
+	change_touch_key_led_voltage(touchkey_voltage);
+}
+
+static void bln_handle_breathe(unsigned long data)
+{
+	schedule_work(&bln_breathe_work);
+}
+#endif
+
+#ifdef LED_LDO_WITH_REGULATOR
+static ssize_t bln_breathing_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	return sprintf(buf,"%d\n", bln_breathing);
+}
+
+static ssize_t bln_breathing_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	if (!strncmp(buf, "on", 2)) bln_breathing = 1;
+	else if (!strncmp(buf, "off", 3)) bln_breathing = 0;
+	else sscanf(buf,"%d\n", &bln_breathing);
+	if (bln_breathing != 1) bln_stop_breathing();
+	return size;
+}
+
+void bln_reset_bln_breathing_steps(void)
+{
+	printk(KERN_DEBUG "[TouchKey-LED] %s\n", __func__);
+
+	//this will reset steps to have steady bln
+	bln_breathing_step_count = 0;
+	bln_breathing_steps[0].start = BL_STANDARD;
+	bln_breathing_steps[0].end = BL_STANDARD;
+	bln_breathing_steps[0].period = 1000;
+	bln_breathing_steps[0].step = 50;
+}
+
+static ssize_t bln_breathing_steps_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	int count = (bln_breathing_step_count == 0 ? 1 : bln_breathing_step_count);
+	int i, len = 0;
+	for (i = 0; i<count; i++) {
+		len += sprintf(buf + len, "%dmV %dmV %dms %dmV\n", bln_breathing_steps[i].start, bln_breathing_steps[i].end,
+						bln_breathing_steps[i].period, bln_breathing_steps[i].step);
+	}
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %s\n", __func__, buf);
+
+	return len;
+}
+
+static ssize_t bln_breathing_steps_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	int ret;
+	int bstart, bend, bperiod, bstep;
+
+	if (!strncmp(buf, "reset", 5)) {
+		bln_reset_bln_breathing_steps();
+		return size;
+	}
+	if (bln_breathing_step_count >= MAX_BLN_BREATHING_STEPS) return -EINVAL;
+	ret = sscanf(buf, "%d %d %d %d", &bstart, &bend, &bperiod, &bstep);
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %s\n", __func__, buf);
+
+	if (ret != 4) return -EINVAL;
+	bln_breathing_steps[bln_breathing_step_count].start = bstart;
+	bln_breathing_steps[bln_breathing_step_count].end = bend;
+	bln_breathing_steps[bln_breathing_step_count].period = bperiod;
+	bln_breathing_steps[bln_breathing_step_count].step = bstep;
+	bln_breathing_step_count++;
+	bln_breathing_idx = 0;
+	bln_breathing_step_idx = 0;
+	return size;
+}
+#endif
+
 static DEVICE_ATTR(blink_control, S_IRUGO | S_IWUGO, bln_blink_control_read, bln_blink_control_write);
 static DEVICE_ATTR(enabled, S_IRUGO | S_IWUGO, bln_enabled_read, bln_enabled_write);
 static DEVICE_ATTR(notification_led, S_IRUGO | S_IWUGO, bln_notification_led_read, bln_notification_led_write);
 static DEVICE_ATTR(version, S_IRUGO, bln_version_read, NULL);
 static DEVICE_ATTR(notification_timeout, S_IRUGO | S_IWUGO,
 			bln_notification_timeout_read, bln_notification_timeout_write);
-
+#ifdef LED_LDO_WITH_REGULATOR
+static DEVICE_ATTR(breathing, S_IRUGO | S_IWUGO, bln_breathing_read, bln_breathing_write);
+static DEVICE_ATTR(breathing_steps, S_IRUGO | S_IWUGO, bln_breathing_steps_read, bln_breathing_steps_write);
+#endif
 static struct attribute *bln_notification_attributes[] = {
         &dev_attr_blink_control.attr,
         &dev_attr_enabled.attr,
         &dev_attr_notification_led.attr,
         &dev_attr_version.attr,
 	&dev_attr_notification_timeout.attr,
+#ifdef LED_LDO_WITH_REGULATOR
+	&dev_attr_breathing.attr,
+	&dev_attr_breathing_steps.attr,
+#endif
         NULL
 };
 
@@ -2336,6 +2490,11 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 	}
 	/* Setup the timer for the timeouts */
 	setup_timer(&bln_notification_timeout_timer, bln_handle_notification_timeout_timer, 0);
+
+#ifdef LED_LDO_WITH_REGULATOR
+	bln_reset_bln_breathing_steps();
+	setup_timer(&bln_breathing_timer, bln_handle_breathe, 0);
+#endif
 #endif
 	return 0;
 }
@@ -2388,6 +2547,12 @@ static void __exit touchkey_exit(void)
 	printk(KERN_DEBUG "[TouchKey] %s\n", __func__);
 	bl_tkey_i2c = NULL;
 	i2c_del_driver(&touchkey_i2c_driver);
+#ifdef CONFIG_TOUCHKEY_BLN
+        misc_deregister(&bln_device);
+#ifdef LED_LDO_WITH_REGULATOR
+	del_timer(&bln_breathing_timer);
+#endif
+#endif
 }
 
 late_initcall(touchkey_init);
