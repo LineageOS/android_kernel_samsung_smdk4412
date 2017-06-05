@@ -2370,6 +2370,44 @@ static void bln_handle_notification_timeout_timer(unsigned long data)
 		mod_timer(&bln_notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
 	}
 }
+
+
+static struct miscdevice led_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name  = "notification",
+};
+
+static ssize_t led_on_touch_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	return sprintf(buf,"%d\n", led_on_keypress ? 0 : 1);
+}
+
+static ssize_t led_on_touch_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	if (!strncmp(buf, "on", 2)) led_on_keypress = 1;
+	else if (!strncmp(buf, "off", 3)) led_on_keypress = 0;
+	else sscanf(buf,"%d\n", &led_on_keypress);
+	led_on_keypress = led_on_keypress ? 0 : 1;
+	return size;
+}
+
+static DEVICE_ATTR(led, S_IRUGO | S_IWUGO, bln_notification_led_read, bln_notification_led_write);
+static DEVICE_ATTR(notification_enabled, S_IRUGO | S_IWUGO, bln_enabled_read, bln_enabled_write);
+
+static struct attribute *led_notification_attributes[] = {
+	&dev_attr_led.attr,
+	&dev_attr_notification_timeout.attr,
+	&dev_attr_notification_enabled.attr,
+#ifdef LED_LDO_WITH_REGULATOR
+	&dev_attr_breathing.attr,
+	&dev_attr_breathing_steps.attr,
+#endif
+    NULL
+};
+
+static struct attribute_group led_notification_group = {
+        .attrs = led_notification_attributes,
+};
 #endif
 
 static int i2c_touchkey_probe(struct i2c_client *client,
@@ -2547,6 +2585,14 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 
 	/* wake lock for breathing-mode BLN */
 	wake_lock_init(&bln_wake_lock, WAKE_LOCK_SUSPEND, "bln_wake_lock");
+	err = misc_register(&led_device);
+	if (err) {
+		printk(KERN_ERR "[LED] sysfs misc_register failed.\n");
+	} else {
+		if (sysfs_create_group( &led_device.this_device->kobj, &led_notification_group) < 0) {
+			printk(KERN_ERR "[LED] sysfs create group failed.\n");
+		}
+	}
 #ifdef LED_LDO_WITH_REGULATOR
 	bln_reset_bln_breathing_steps();
 	setup_timer(&bln_breathing_timer, bln_handle_breathe, 0);
@@ -2605,6 +2651,7 @@ static void __exit touchkey_exit(void)
 	i2c_del_driver(&touchkey_i2c_driver);
 #ifdef CONFIG_TOUCHKEY_BLN
         misc_deregister(&bln_device);
+	misc_deregister(&led_device);
 #ifdef LED_LDO_WITH_REGULATOR
 	del_timer(&bln_breathing_timer);
 #endif
