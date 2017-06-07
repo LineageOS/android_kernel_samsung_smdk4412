@@ -131,6 +131,8 @@ extern int get_touchkey_firmware(char *version);
 static int touchkey_led_status;
 static int touchled_cmd_reversed;
 static int led_on_keypress = 0;
+static bool touchkey_pressed = false;
+static bool touchkey_pressed_reversed = false;
 
 static int touchkey_debug_count;
 static char touchkey_debug[104];
@@ -986,6 +988,10 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	}
 #endif
 	if (led_on_keypress) {
+		touchkey_pressed = pressed;
+	}
+	if (touchkey_pressed_reversed) {
+		touchkey_pressed_reversed = false;
 #ifdef LED_LDO_WITH_REGULATOR
 		if (pressed) {
 			/* Break-off running fade-out process */
@@ -1400,6 +1406,7 @@ static ssize_t touchkey_led_control(struct device *dev,
 			__func__, __LINE__);
 		return size;
 	}
+	printk(KERN_DEBUG "[TouchKey] %s: %d\n", __func__, data);
 #ifdef CONFIG_TOUCHKEY_BLN
 	if (bln_enabled && bln_ongoing) {
 		touchled_cmd_reversed = data > 0;
@@ -1407,12 +1414,12 @@ static ssize_t touchkey_led_control(struct device *dev,
 		return size;
 	}
 #endif
-
+	touchkey_pressed_reversed = led_on_keypress && data > 0;
 #ifdef LED_LDO_WITH_REGULATOR
 	if (led_fadein || led_fadeout) {
 		update_touchkey_brightness(data, false);
 	}
-	if (!led_on_keypress && led_fadein && data > 1 && touchkey_enable) {
+	if ((!led_on_keypress || touchkey_pressed) && led_fadein && data > 1 && touchkey_enable) {
 		/* Break-off running fade-out process */
 		led_abort_fade = 1;
 		cancel_work_sync(&led_fadeout_work);
@@ -1428,8 +1435,8 @@ static ssize_t touchkey_led_control(struct device *dev,
 		return size;
 	}
 
-	if (!led_on_keypress && data > 1 && touchkey_enable) {
-		update_touchkey_brightness(data, true);
+	if (data > 1 && touchkey_enable) {
+		update_touchkey_brightness(data, !led_on_keypress || touchkey_pressed);
 	}
 	data = data ? 1 : 0;
 #endif
@@ -1445,7 +1452,7 @@ static ssize_t touchkey_led_control(struct device *dev,
 #else
 	data = ledCmd[data];
 #endif
-	if (!led_on_keypress || data == TK_CMD_LED_OFF) {
+	if (!led_on_keypress || touchkey_pressed || data == TK_CMD_LED_OFF) {
 		ret = i2c_touchkey_write(tkey_i2c->client, (u8 *) &data, 1);
 
 		if (ret == -ENODEV)
