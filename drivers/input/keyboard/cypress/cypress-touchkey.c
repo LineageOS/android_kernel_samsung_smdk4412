@@ -1428,8 +1428,8 @@ static ssize_t touchkey_led_control(struct device *dev,
 		return size;
 	}
 
-	if (!led_on_keypress && data > 1 && touchkey_enable) {
-		update_touchkey_brightness(data, true);
+	if (data > 1 && touchkey_enable) {
+		update_touchkey_brightness(data, !led_on_keypress);
 	}
 	data = data ? 1 : 0;
 #endif
