@@ -142,6 +142,7 @@ static struct touchkey_i2c *bl_tkey_i2c = NULL;
 #ifdef CONFIG_TOUCHKEY_BLN
 #include <linux/miscdevice.h>
 #include <linux/time.h>
+#include <linux/wakelock.h>
 #define BLN_VERSION 9
 int bln_notification_timeout = -1;
 long bln_notification_timeout_sec;
@@ -154,6 +155,8 @@ static bool bln_enabled = false;
 static bool bln_ongoing = false;
 static bool bln_blink_enabled = false;
 static bool bln_suspended = false;
+static bool bln_use_wakelock = false;
+static struct wake_lock bln_wake_lock;
 
 static DEFINE_MUTEX(led_notification_mutex);
 static void enable_led_notification(void);
@@ -2021,7 +2024,13 @@ static void enable_led_notification(void) {
 			mod_timer(&bln_notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
 		}
 #ifdef LED_LDO_WITH_REGULATOR
-		if (bln_breathing) mod_timer(&bln_breathing_timer, jiffies + 4);
+		if (bln_breathing){
+			if (!wake_lock_active(&bln_wake_lock) && bln_notification_timeout > 0 && bln_use_wakelock) {
+			    printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Lock wakelock\n", __func__);
+			    wake_lock(&bln_wake_lock);
+			}
+			mod_timer(&bln_breathing_timer, jiffies + 4);
+		}
 #endif
 	}
 	mutex_unlock(&led_notification_mutex);
@@ -2185,6 +2194,11 @@ void bln_stop_breathing(void)
 
 	del_timer(&bln_breathing_timer);
 	change_touch_key_led_voltage(touchkey_voltage);
+
+	if (wake_lock_active(&bln_wake_lock)){
+            printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Unlock wakelock\n", __func__);
+            wake_unlock(&bln_wake_lock);
+        }
 }
 
 static void bln_handle_breathe(unsigned long data)
@@ -2218,6 +2232,7 @@ void bln_reset_bln_breathing_steps(void)
 	bln_breathing_steps[0].end = BL_STANDARD;
 	bln_breathing_steps[0].period = 1000;
 	bln_breathing_steps[0].step = 50;
+	bln_use_wakelock = false;
 }
 
 static ssize_t bln_breathing_steps_read( struct device *dev, struct device_attribute *attr, char *buf )
@@ -2254,6 +2269,36 @@ static ssize_t bln_breathing_steps_write( struct device *dev, struct device_attr
 	bln_breathing_step_count++;
 	bln_breathing_idx = 0;
 	bln_breathing_step_idx = 0;
+
+	bln_use_wakelock = (bln_breathing_step_count > 1)  || (bstart != bend);
+	if (bln_use_wakelock) {
+		printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing configuration needs wakelock\n", __func__);
+	}
+	return size;
+}
+
+
+
+static ssize_t bln_breathing_use_wakelock_read( struct device *dev, struct device_attribute *attr, char *buf ) {
+	return sprintf(buf,"%u\n", (bln_use_wakelock ? 1 : 0));
+}
+
+static ssize_t bln_breathing_use_wakelock_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size ) {
+
+	unsigned int data;
+
+	if (sscanf(buf,"%u\n", &data) == 1) {
+		if (data == 1) bln_use_wakelock = true;
+		if (data == 0) bln_use_wakelock = false;
+	} else {
+		if (!strncmp(buf, "on", 2)) bln_use_wakelock = true;
+		if (!strncmp(buf, "off", 3)) bln_use_wakelock = false;
+	}
+	if (bln_use_wakelock) {
+		printk(KERN_DEBUG "[TouchKey-BLN] %s: Enabled wakelock for breathing configuration\n", __func__);
+	} else {
+		printk(KERN_DEBUG "[TouchKey-BLN] %s: Disabled wakelock for breathing configuration\n", __func__);
+	}
 	return size;
 }
 #endif
@@ -2267,6 +2312,7 @@ static DEVICE_ATTR(notification_timeout, S_IRUGO | S_IWUGO,
 #ifdef LED_LDO_WITH_REGULATOR
 static DEVICE_ATTR(breathing, S_IRUGO | S_IWUGO, bln_breathing_read, bln_breathing_write);
 static DEVICE_ATTR(breathing_steps, S_IRUGO | S_IWUGO, bln_breathing_steps_read, bln_breathing_steps_write);
+static DEVICE_ATTR(breathing_use_wakelock, S_IRUGO | S_IWUGO, bln_breathing_use_wakelock_read, bln_breathing_use_wakelock_write);
 #endif
 static struct attribute *bln_notification_attributes[] = {
         &dev_attr_blink_control.attr,
@@ -2277,6 +2323,7 @@ static struct attribute *bln_notification_attributes[] = {
 #ifdef LED_LDO_WITH_REGULATOR
 	&dev_attr_breathing.attr,
 	&dev_attr_breathing_steps.attr,
+	&dev_attr_breathing_use_wakelock.attr,
 #endif
         NULL
 };
@@ -2498,6 +2545,8 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 	/* Setup the timer for the timeouts */
 	setup_timer(&bln_notification_timeout_timer, bln_handle_notification_timeout_timer, 0);
 
+	/* wake lock for breathing-mode BLN */
+	wake_lock_init(&bln_wake_lock, WAKE_LOCK_SUSPEND, "bln_wake_lock");
 #ifdef LED_LDO_WITH_REGULATOR
 	bln_reset_bln_breathing_steps();
 	setup_timer(&bln_breathing_timer, bln_handle_breathe, 0);
