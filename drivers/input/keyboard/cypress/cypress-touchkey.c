@@ -142,6 +142,7 @@ static struct touchkey_i2c *bl_tkey_i2c = NULL;
 #ifdef CONFIG_TOUCHKEY_BLN
 #include <linux/miscdevice.h>
 #include <linux/time.h>
+#include <linux/wakelock.h>
 #define BLN_VERSION 9
 int bln_notification_timeout = -1;
 long bln_notification_timeout_sec;
@@ -154,6 +155,7 @@ static bool bln_enabled = false;
 static bool bln_ongoing = false;
 static bool bln_blink_enabled = false;
 static bool bln_suspended = false;
+static struct wake_lock bln_wake_lock;
 
 static DEFINE_MUTEX(led_notification_mutex);
 static void enable_led_notification(void);
@@ -2021,7 +2023,13 @@ static void enable_led_notification(void) {
 			mod_timer(&bln_notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
 		}
 #ifdef LED_LDO_WITH_REGULATOR
-		if (bln_breathing) mod_timer(&bln_breathing_timer, jiffies + 4);
+		if (bln_breathing){
+			if (!wake_lock_active(&bln_wake_lock) && bln_notification_timeout > 0) {
+			    printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Lock wakelock\n", __func__);
+			    wake_lock(&bln_wake_lock);
+			}
+			mod_timer(&bln_breathing_timer, jiffies + 4);
+		}
 #endif
 	}
 	mutex_unlock(&led_notification_mutex);
@@ -2185,6 +2193,11 @@ void bln_stop_breathing(void)
 
 	del_timer(&bln_breathing_timer);
 	change_touch_key_led_voltage(touchkey_voltage);
+
+	if (wake_lock_active(&bln_wake_lock)){
+            printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Unlock wakelock\n", __func__);
+            wake_unlock(&bln_wake_lock);
+        }
 }
 
 static void bln_handle_breathe(unsigned long data)
@@ -2498,6 +2511,8 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 	/* Setup the timer for the timeouts */
 	setup_timer(&bln_notification_timeout_timer, bln_handle_notification_timeout_timer, 0);
 
+	/* wake lock for breathing-mode BLN */
+	wake_lock_init(&bln_wake_lock, WAKE_LOCK_SUSPEND, "bln_wake_lock");
 #ifdef LED_LDO_WITH_REGULATOR
 	bln_reset_bln_breathing_steps();
 	setup_timer(&bln_breathing_timer, bln_handle_breathe, 0);
