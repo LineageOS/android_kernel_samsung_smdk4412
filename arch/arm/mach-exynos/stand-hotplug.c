@@ -149,6 +149,7 @@ static DEFINE_PER_CPU(struct cpu_time_info, hotplug_cpu_time);
 /* mutex can be used since hotplug_timer does not run in
    timer(softirq) context but in process context */
 static DEFINE_MUTEX(hotplug_lock);
+static bool pm_hotplug_enabled = true;
 
 bool hotplug_out_chk(unsigned int nr_online_cpu, unsigned int threshold_up,
 		unsigned int avg_load, unsigned int cur_freq)
@@ -233,6 +234,12 @@ static void hotplug_timer(struct work_struct *work)
 
 	mutex_lock(&hotplug_lock);
 
+	if(!pm_hotplug_enabled) {
+		printk(KERN_INFO "stand-hotplug: hotplug is disabled for current governor\n");
+		goto off_hotplug;
+	}
+
+
 	if (user_lock == 1)
 		goto no_hotplug;
 
@@ -300,6 +307,7 @@ static void hotplug_timer(struct work_struct *work)
 no_hotplug:
 
 	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
+off_hotplug:
 
 	mutex_unlock(&hotplug_lock);
 }
@@ -349,6 +357,48 @@ static struct notifier_block hotplug_reboot_notifier = {
 	.notifier_call = hotplug_reboot_notifier_call,
 };
 
+static int pm_hotplug_cpufreq_policy_notifier_call(struct notifier_block *this,
+				unsigned long code, void *data)
+{
+	struct cpufreq_policy *policy = data;
+	switch (code) {
+	case CPUFREQ_ADJUST:
+		if (!strnicmp(policy->governor->name, "pegasusq", CPUFREQ_NAME_LEN))
+		{
+			if(pm_hotplug_enabled)
+			{
+				printk(KERN_INFO "pm-hotplug is disabled: governor=%s\n",
+								policy->governor->name);
+				mutex_lock(&hotplug_lock);
+				pm_hotplug_enabled = false;
+				mutex_unlock(&hotplug_lock);
+			}
+		}
+		else
+		{
+			if(!pm_hotplug_enabled)
+			{
+				printk(KERN_INFO "pm-hotplug is enabled: governor=%s\n",
+								policy->governor->name);
+				mutex_lock(&hotplug_lock);
+				pm_hotplug_enabled = true;
+				queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
+				mutex_unlock(&hotplug_lock);
+			}
+		}
+		break;
+	case CPUFREQ_INCOMPATIBLE:
+	case CPUFREQ_NOTIFY:
+	default:
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+static struct notifier_block pm_hotplug_cpufreq_policy_notifier = {
+	.notifier_call = pm_hotplug_cpufreq_policy_notifier_call,
+};
+
 static int __init exynos4_pm_hotplug_init(void)
 {
 	unsigned int i;
@@ -387,6 +437,8 @@ static int __init exynos4_pm_hotplug_init(void)
 	register_pm_notifier(&exynos4_pm_hotplug_notifier);
 	register_reboot_notifier(&hotplug_reboot_notifier);
 
+	cpufreq_register_notifier(&pm_hotplug_cpufreq_policy_notifier,
+						CPUFREQ_POLICY_NOTIFIER);
 	return 0;
 }
 
@@ -400,6 +452,11 @@ static struct platform_device exynos4_pm_hotplug_device = {
 static int __init exynos4_pm_hotplug_device_init(void)
 {
 	int ret;
+#if defined(CONFIG_CPU_FREQ_DEFAULT_GOV_PEGASUSQ)
+	pm_hotplug_enabled = false;
+#else
+	pm_hotplug_enabled = true;
+#endif
 
 	ret = platform_device_register(&exynos4_pm_hotplug_device);
 
