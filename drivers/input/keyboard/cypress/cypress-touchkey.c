@@ -2025,7 +2025,7 @@ static void enable_led_notification(void) {
 		}
 #ifdef LED_LDO_WITH_REGULATOR
 		if (bln_breathing){
-			if (!wake_lock_active(&bln_wake_lock) && bln_notification_timeout > 0 && bln_use_wakelock) {
+			if (!wake_lock_active(&bln_wake_lock) && bln_use_wakelock) {
 			    printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Lock wakelock\n", __func__);
 			    wake_lock(&bln_wake_lock);
 			}
