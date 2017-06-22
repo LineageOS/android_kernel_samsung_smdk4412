@@ -2092,18 +2092,19 @@ static ssize_t bln_notification_led_write(struct device *dev, struct device_attr
 	if (sscanf(buf,"%u\n", &data ) == 1) {
 		if (data == 0 || data == 1) {
 			if (data == 1) {
-				printk(KERN_ERR "[TouchKey-BLN] %s: Activating BLN\n", __func__);
-				if (bln_suspended) {
+				if (bln_suspended && bln_enabled) {
+					printk(KERN_DEBUG "[TouchKey-BLN] %s: Activating BLN\n", __func__);
 					enable_led_notification();
+					bln_ongoing = data;
 				}
 			}
 			if (data == 0) {
-				printk(KERN_ERR "[TouchKey-BLN] %s: Deactivating BLN\n", __func__);
 				if (bln_suspended) {
+					printk(KERN_DEBUG "[TouchKey-BLN] %s: Deactivating BLN\n", __func__);
 					disable_led_notification();
 				}
+				bln_ongoing = data;
 			}
-			bln_ongoing = data;
 		} else {
 			printk(KERN_ERR "[TouchKey-BLN] %s: Invalid value %s\n", __func__, buf);
 		}
