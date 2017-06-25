@@ -144,7 +144,7 @@ static struct touchkey_i2c *bl_tkey_i2c = NULL;
 #include <linux/time.h>
 #include <linux/wakelock.h>
 #define BLN_VERSION 9
-int bln_notification_timeout = -1;
+int bln_notification_timeout = 600000;
 long bln_notification_timeout_sec;
 
 static struct timer_list bln_notification_timeout_timer;
@@ -182,6 +182,18 @@ struct bln_breathing_step bln_breathing_steps[MAX_BLN_BREATHING_STEPS];
 static int bln_breathing_idx = 0;
 static int bln_breathing_step_idx = 0;
 #endif
+
+/* Led-blink control variables */
+static unsigned int bln_led_blink_enabled = 0;
+struct bln_led_blink_control {
+	int delay_on; //ms
+	int delay_off; //ms
+	int brightness; //0 - 255
+};
+static struct bln_led_blink_control bln_led_blink;
+struct bln_breathing_step bln_led_control_steps_backup[2];
+static int bln_breathing_step_count_backup = 0;
+static int bln_notification_timeout_backup = 0;
 
 #endif
 
@@ -244,12 +256,15 @@ void set_touch_constraints(bool blnstatus)
 	r->rdev->constraints->state_mem.disabled = !blnstatus;
 }
 
+int get_touchkey_voltage(int level) {
+	return BL_MIN + ((((level * 100 / 255) * (BL_MAX - BL_MIN)) / 100) / 50) * 50;
+}
+
 void update_touchkey_brightness(unsigned int level, bool set_voltage)
 {
 	if (level > 0 && level < 256) {
 		printk(KERN_DEBUG "[TouchKey-LED] %s: %d\n", __func__, level);
-		touchkey_voltage_brightness = BL_MIN +
-			((((level * 100 / 255) * (BL_MAX - BL_MIN)) / 100) / 50) * 50;
+		touchkey_voltage_brightness = get_touchkey_voltage(level);
 		if (set_voltage) {
 			touchkey_voltage = touchkey_voltage_brightness;
 			change_touch_key_led_voltage(touchkey_voltage_brightness);
@@ -2037,6 +2052,40 @@ static void enable_led_notification(void) {
 			mod_timer(&bln_notification_timeout_timer, jiffies + msecs_to_jiffies(1000));
 		}
 #ifdef LED_LDO_WITH_REGULATOR
+		if (bln_led_blink_enabled && (bln_led_blink.delay_on || bln_led_blink.delay_off)) {
+			printk(KERN_DEBUG
+				"[TouchKey-BLN] %s: Using breathing for LED-blink control.\n", __func__);
+			int brightness = get_touchkey_voltage(bln_led_blink.brightness);
+			// Always on
+			if (bln_led_blink.delay_on == 1) {
+				printk(KERN_DEBUG
+					"[TouchKey-BLN] %s: LED-blink control: always on (brightness=%d)\n",
+					 __func__, bln_led_blink.brightness);
+				bln_breathing_step_count = 1;
+				bln_breathing_steps[0].start = brightness;
+				bln_breathing_steps[0].end = brightness;
+				bln_breathing_steps[0].period = 1000;
+				bln_breathing_steps[0].step = 50;
+				bln_use_wakelock = false;
+				bln_notification_timeout = 0;
+			// Otherwise blinking
+			} else {
+				printk(KERN_DEBUG
+			"[TouchKey-BLN] %s: LED-blink control: blinking (brightness=%d) for %d seconds\n",
+					__func__, bln_led_blink.brightness, bln_notification_timeout / 1000);
+				bln_breathing_step_count = 2;
+				bln_breathing_steps[0].start = brightness;
+				bln_breathing_steps[0].end = brightness;
+				bln_breathing_steps[0].period = bln_led_blink.delay_on;
+				bln_breathing_steps[0].step = 50;
+				bln_breathing_steps[1].start = BL_MIN;
+				bln_breathing_steps[1].end = BL_MIN;
+				bln_breathing_steps[1].period = bln_led_blink.delay_off;
+				bln_breathing_steps[1].step = 50;
+				bln_use_wakelock = true;
+			}
+			bln_breathing = true;
+		}
 		if (bln_breathing){
 			if (!wake_lock_active(&bln_wake_lock) && bln_use_wakelock) {
 			    printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Lock wakelock\n", __func__);
@@ -2283,6 +2332,12 @@ static ssize_t bln_breathing_steps_write( struct device *dev, struct device_attr
 	bln_breathing_steps[bln_breathing_step_count].end = bend;
 	bln_breathing_steps[bln_breathing_step_count].period = bperiod;
 	bln_breathing_steps[bln_breathing_step_count].step = bstep;
+	if (bln_breathing_step_count < 2) {
+		bln_led_control_steps_backup[bln_breathing_step_count].start = bstart;
+		bln_led_control_steps_backup[bln_breathing_step_count].end = bend;
+		bln_led_control_steps_backup[bln_breathing_step_count].period = bperiod;
+		bln_led_control_steps_backup[bln_breathing_step_count].step = bstep;
+	}
 	bln_breathing_step_count++;
 	bln_breathing_idx = 0;
 	bln_breathing_step_idx = 0;
@@ -2294,6 +2349,73 @@ static ssize_t bln_breathing_steps_write( struct device *dev, struct device_attr
 	return size;
 }
 
+static ssize_t bln_led_blink_enabled_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	return sprintf(buf,"%d\n", bln_led_blink_enabled);
+}
+
+static ssize_t bln_led_blink_enabled_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	unsigned int old_bln_led_blink_enabled = bln_led_blink_enabled;
+	int index;
+	if (!strncmp(buf, "on", 2)) bln_led_blink_enabled = 1;
+	else if (!strncmp(buf, "off", 3)) bln_led_blink_enabled = 0;
+	else sscanf(buf,"%d\n", &bln_led_blink_enabled);
+	if (bln_led_blink_enabled != 1) bln_stop_breathing();
+
+	if (bln_led_blink_enabled != old_bln_led_blink_enabled) {
+		if (bln_led_blink_enabled) {
+			//Backup breathing steps, because led-blink will overwrite this.
+			printk(KERN_DEBUG "[TouchKey-BLN] %s: Backup breathing steps \n", __func__);
+			for (index = 0; index < 2; index++) {
+				bln_led_control_steps_backup[index].start = bln_breathing_steps[index].start;
+				bln_led_control_steps_backup[index].end = bln_breathing_steps[index].end;
+				bln_led_control_steps_backup[index].period = bln_breathing_steps[index].period;
+				bln_led_control_steps_backup[index].step = bln_breathing_steps[index].step;
+			}
+			bln_breathing_step_count_backup = bln_breathing_step_count;
+			bln_notification_timeout_backup = bln_notification_timeout;
+		} else {
+			//Restore original breathing steps
+			printk(KERN_DEBUG "[TouchKey-BLN] %s: Restore breathing steps \n", __func__);
+			for (index = 0; index < 2; index++) {
+				bln_breathing_steps[index].start = bln_led_control_steps_backup[index].start;
+				bln_breathing_steps[index].end = bln_led_control_steps_backup[index].end;
+				bln_breathing_steps[index].period = bln_led_control_steps_backup[index].period;
+				bln_breathing_steps[index].step = bln_led_control_steps_backup[index].step;
+			}
+			bln_breathing_step_count = bln_breathing_step_count_backup;
+			bln_notification_timeout = bln_notification_timeout_backup;
+		}
+	}
+
+	return size;
+}
+
+static ssize_t bln_led_blink_read( struct device *dev, struct device_attribute *attr, char *buf )
+{
+	int len = 0;
+
+	len = sprintf(buf, "%08x %d %d\n", bln_led_blink.brightness, bln_led_blink.delay_on, bln_led_blink.delay_off);
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %s\n", __func__, buf);
+
+	return len;
+}
+
+static ssize_t bln_led_blink_write( struct device *dev, struct device_attribute *attr, const char *buf, size_t size )
+{
+	int ret, brightness, delay_on, delay_off;
+
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: %s\n", __func__, buf);
+	ret = sscanf(buf, "%08x %d %d", &brightness, &delay_on, &delay_off);
+	if (ret != 3) return -EINVAL;
+
+	bln_led_blink.brightness = brightness;
+	bln_led_blink.delay_on = delay_on;
+	bln_led_blink.delay_off = delay_off;
+
+	return size;
+}
 
 
 static ssize_t bln_breathing_use_wakelock_read( struct device *dev, struct device_attribute *attr, char *buf ) {
@@ -2330,6 +2452,8 @@ static DEVICE_ATTR(notification_timeout, S_IRUGO | S_IWUGO,
 static DEVICE_ATTR(breathing, S_IRUGO | S_IWUGO, bln_breathing_read, bln_breathing_write);
 static DEVICE_ATTR(breathing_steps, S_IRUGO | S_IWUGO, bln_breathing_steps_read, bln_breathing_steps_write);
 static DEVICE_ATTR(breathing_use_wakelock, S_IRUGO | S_IWUGO, bln_breathing_use_wakelock_read, bln_breathing_use_wakelock_write);
+static DEVICE_ATTR(led_blink_enabled, S_IRUGO | S_IWUGO, bln_led_blink_enabled_read, bln_led_blink_enabled_write);
+static DEVICE_ATTR(led_blink, S_IRUGO | S_IWUGO, bln_led_blink_read, bln_led_blink_write);
 #endif
 static struct attribute *bln_notification_attributes[] = {
         &dev_attr_blink_control.attr,
@@ -2341,6 +2465,8 @@ static struct attribute *bln_notification_attributes[] = {
 	&dev_attr_breathing.attr,
 	&dev_attr_breathing_steps.attr,
 	&dev_attr_breathing_use_wakelock.attr,
+	&dev_attr_led_blink_enabled.attr,
+        &dev_attr_led_blink.attr,
 #endif
         NULL
 };
