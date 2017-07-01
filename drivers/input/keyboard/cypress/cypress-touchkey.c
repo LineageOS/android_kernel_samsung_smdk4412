@@ -1155,6 +1155,17 @@ static int sec_touchkey_early_suspend(struct early_suspend *h)
 				 touchkey_keycode[i], 0);
 	}
 	input_sync(tkey_i2c->input_dev);
+
+#ifdef CONFIG_TOUCHKEY_BLN
+	bln_suspended = true;
+	if (bln_enabled && bln_ongoing) {
+		printk(KERN_DEBUG
+			"[TouchKey-BLN] %s: BLN is still active\n",
+			__func__);
+		set_touchkey_debug('S');
+		return 0;
+	}
+#endif
 #ifdef LED_LDO_WITH_REGULATOR
 	if (led_fadeout) {
 		led_fadeout_process(NULL);
@@ -1176,27 +1187,11 @@ static int sec_touchkey_early_suspend(struct early_suspend *h)
 	/* disable ldo11 */
 	tkey_i2c->pdata->power_on(0);
 
-#ifdef CONFIG_TOUCHKEY_BLN
-	bln_suspended = true;
-	if (bln_enabled && bln_ongoing) {
-		printk(KERN_DEBUG "[TouchKey-BLN] %s: Resume BLN\n",
-			__func__);
-		enable_led_notification();
-	}
-#endif
 	return 0;
 }
 
 static int sec_touchkey_late_resume(struct early_suspend *h)
 {
-#ifdef CONFIG_TOUCHKEY_BLN
-	if (bln_enabled && bln_ongoing) {
-		printk(KERN_DEBUG "[TouchKey-BLN] %s: Pausing BLN\n",
-			__func__);
-		disable_led_notification();
-	}
-	bln_suspended = false;
-#endif
 
 	struct touchkey_i2c *tkey_i2c =
 		container_of(h, struct touchkey_i2c, early_suspend);
@@ -1206,6 +1201,26 @@ static int sec_touchkey_late_resume(struct early_suspend *h)
 
 	set_touchkey_debug('R');
 	printk(KERN_DEBUG "[TouchKey] sec_touchkey_late_resume\n");
+
+#ifdef CONFIG_TOUCHKEY_BLN
+	bln_suspended = false;
+	if (bln_enabled && bln_ongoing) {
+		printk(KERN_DEBUG
+			"[TouchKey-BLN] %s: BLN is still active, enabling touchkey only\n",
+			__func__);
+		set_touchkey_debug('R');
+		touchkey_enable = 1;
+#if defined(TK_HAS_AUTOCAL)
+		touchkey_autocalibration(tkey_i2c);
+#endif
+#ifdef TEST_JIG_MODE
+		i2c_touchkey_write(tkey_i2c->client, &get_touch, 1);
+#endif
+		enable_irq(tkey_i2c->irq);
+
+		return 0;
+	}
+#endif
 
 	/* enable ldo11 */
 	tkey_i2c->pdata->power_on(1);
@@ -1412,8 +1427,8 @@ static ssize_t touchkey_led_control(struct device *dev,
 	printk(KERN_DEBUG "[TouchKey] %s: %d\n", __func__, data);
 #ifdef CONFIG_TOUCHKEY_BLN
 	if (bln_enabled && bln_ongoing) {
-		touchled_cmd_reversed = data > 0;
-		touchkey_led_status = data > 0 ? TK_CMD_LED_ON : TK_CMD_LED_OFF;
+		printk(KERN_DEBUG
+			"[TouchKey] %s: Ignoring because BLN is active and ongoing\n", __func__);
 		return size;
 	}
 #endif
@@ -2002,9 +2017,7 @@ static void enable_led_notification(void) {
 	mutex_lock(&led_notification_mutex);
 	printk(KERN_DEBUG "[TouchKey-BLN] %s\n", __func__);
 	if (touchkey_enable != 1) {
-		if (bln_suspended) {
-			touchkey_activate();
-		}
+		touchkey_activate();
 	}
 	if (touchkey_enable == 1) {
 		printk(KERN_DEBUG "[TouchKey-BLN] bln_ongoing set to true\n");
@@ -2056,7 +2069,12 @@ static void disable_led_notification(void) {
 			del_timer(&bln_notification_timeout_timer);
 		}
 #ifdef LED_LDO_WITH_REGULATOR
-		if (bln_breathing) bln_stop_breathing();
+		if (bln_breathing) {
+			bln_stop_breathing();
+
+			/* Restore original voltage */
+			change_touch_key_led_voltage(bln_suspended ? BL_MIN : touchkey_voltage_brightness);
+		}
 #endif
 	}
 	mutex_unlock(&led_notification_mutex);
@@ -2092,17 +2110,15 @@ static ssize_t bln_notification_led_write(struct device *dev, struct device_attr
 	if (sscanf(buf,"%u\n", &data ) == 1) {
 		if (data == 0 || data == 1) {
 			if (data == 1) {
-				if (bln_suspended && bln_enabled) {
+				if (bln_enabled) {
 					printk(KERN_DEBUG "[TouchKey-BLN] %s: Activating BLN\n", __func__);
 					enable_led_notification();
 					bln_ongoing = data;
 				}
 			}
 			if (data == 0) {
-				if (bln_suspended) {
-					printk(KERN_DEBUG "[TouchKey-BLN] %s: Deactivating BLN\n", __func__);
-					disable_led_notification();
-				}
+				printk(KERN_DEBUG "[TouchKey-BLN] %s: Deactivating BLN\n", __func__);
+				disable_led_notification();
 				bln_ongoing = data;
 			}
 		} else {
@@ -2353,7 +2369,7 @@ static void bln_notification_off_process(struct work_struct *work)
 
 static void bln_handle_notification_timeout_timer(unsigned long data)
 {
-	if (bln_notification_timeout > 0 && bln_suspended) {
+	if (bln_notification_timeout > 0) {
 		struct timespec spec = CURRENT_TIME;
 		printk(KERN_DEBUG "[TouchKey-BLN] %s: Timing out in %d seconds\n",
 			__func__, bln_notification_timeout_sec - spec.tv_sec);
