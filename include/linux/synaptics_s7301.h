@@ -38,7 +38,7 @@
 #include <mach/cpufreq.h>
 #include <mach/dev.h>
 #define SEC_DVFS_LOCK_TIMEOUT	200
-#define SEC_DVFS_LOCK_FREQ		800000
+#define SEC_DVFS_LOCK_FREQ		200000 /* 800000 */
 #define SEC_BUS_LOCK_FREQ		267160
 #define SEC_BUS_LOCK_FREQ2	400200
 #endif
