@@ -65,19 +65,19 @@ struct alarm {
 	void			(*function)(struct alarm *);
 };
 
-void alarm_init(struct alarm *alarm,
+void android_alarm_init(struct alarm *alarm,
 	enum android_alarm_type type, void (*function)(struct alarm *));
-void alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end);
-int alarm_try_to_cancel(struct alarm *alarm);
-int alarm_cancel(struct alarm *alarm);
-ktime_t alarm_get_elapsed_realtime(void);
+void android_alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end);
+int android_alarm_try_to_cancel(struct alarm *alarm);
+int android_alarm_cancel(struct alarm *alarm);
+ktime_t android_alarm_get_elapsed_realtime(void);
 
 /* set rtc while preserving elapsed realtime */
-int alarm_set_rtc(const struct timespec ts);
+int android_alarm_set_rtc(const struct timespec ts);
 #if defined(CONFIG_RTC_ALARM_BOOT)
-int alarm_set_alarm_boot(char *alarm_data);
+int android_alarm_set_alarm_boot(char *alarm_data);
 #elif defined(CONFIG_RTC_POWER_OFF)
-int alarm_set_alarm_poweroff(char *alarm_data);
+int android_alarm_set_alarm_poweroff(char *alarm_data);
 #endif
 
 #endif
