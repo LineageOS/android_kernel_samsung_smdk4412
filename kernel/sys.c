@@ -2008,7 +2008,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			error = prctl_get_seccomp();
 			break;
 		case PR_SET_SECCOMP:
-			error = prctl_set_seccomp(arg2);
+			error = prctl_set_seccomp(arg2, (char __user *)arg3);
 			break;
 		case PR_GET_TSC:
 			error = GET_TSC_CTL(arg2);
@@ -2106,12 +2106,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			if (arg2 != 1 || arg3 || arg4 || arg5)
 				return -EINVAL;
 
-			current->no_new_privs = 1;
+			task_set_no_new_privs(current);
 			break;
 		case PR_GET_NO_NEW_PRIVS:
 			if (arg2 || arg3 || arg4 || arg5)
 				return -EINVAL;
-			return current->no_new_privs ? 1 : 0;
+			return task_no_new_privs(current) ? 1 : 0;
 		default:
 			error = -EINVAL;
 			break;
