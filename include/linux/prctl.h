@@ -102,7 +102,57 @@
 
 #define PR_MCE_KILL_GET 34
 
+/*
+ * Tune up process memory map specifics.
+ */
+#define PR_SET_MM		35
+# define PR_SET_MM_START_CODE		1
+# define PR_SET_MM_END_CODE		2
+# define PR_SET_MM_START_DATA		3
+# define PR_SET_MM_END_DATA		4
+# define PR_SET_MM_START_STACK		5
+# define PR_SET_MM_START_BRK		6
+# define PR_SET_MM_BRK			7
+
+/*
+ * Set specific pid that is allowed to ptrace the current task.
+ * A value of 0 mean "no process".
+ */
+#define PR_SET_PTRACER 0x59616d61
+# define PR_SET_PTRACER_ANY ((unsigned long)-1)
+
+#define PR_SET_CHILD_SUBREAPER 36
+#define PR_GET_CHILD_SUBREAPER 37
+
+/* Sets the timerslack for arbitrary threads
+ * arg2 slack value, 0 means "use default"
+ * arg3 pid of the thread whose timer slack needs to be set
+ */
+#define PR_SET_TIMERSLACK_PID 41
+
 #define PR_SET_VMA		0x53564d41
 # define PR_SET_VMA_ANON_NAME		0
+
+/*
+ * If no_new_privs is set, then operations that grant new privileges (i.e.
+ * execve) will either fail or not grant them.  This affects suid/sgid,
+ * file capabilities, and LSMs.
+ *
+ * Operations that merely manipulate or drop existing privileges (setresuid,
+ * capset, etc.) will still work.  Drop those privileges if you want them gone.
+ *
+ * Changing LSM security domain is considered a new privilege.  So, for example,
+ * asking selinux for a specific new context (e.g. with runcon) will result
+ * in execve returning -EPERM.
+ */
+#define PR_SET_NO_NEW_PRIVS 38
+#define PR_GET_NO_NEW_PRIVS 39
+
+/* Control the ambient capability set */
+#define PR_CAP_AMBIENT			47
+# define PR_CAP_AMBIENT_IS_SET		1
+# define PR_CAP_AMBIENT_RAISE		2
+# define PR_CAP_AMBIENT_LOWER		3
+# define PR_CAP_AMBIENT_CLEAR_ALL	4
 
 #endif /* _LINUX_PRCTL_H */

@@ -130,6 +130,7 @@ struct request_sock;
 #define LSM_UNSAFE_SHARE	1
 #define LSM_UNSAFE_PTRACE	2
 #define LSM_UNSAFE_PTRACE_CAP	4
+#define LSM_UNSAFE_NO_NEW_PRIVS	8
 
 #ifdef CONFIG_MMU
 /*
@@ -2425,7 +2426,7 @@ static inline int security_task_prctl(int option, unsigned long arg2,
 				      unsigned long arg4,
 				      unsigned long arg5)
 {
-	return cap_task_prctl(option, arg2, arg3, arg3, arg5);
+	return cap_task_prctl(option, arg2, arg3, arg4, arg5);
 }
 
 static inline void security_task_to_inode(struct task_struct *p, struct inode *inode)

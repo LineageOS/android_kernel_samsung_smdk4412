@@ -40,9 +40,9 @@
 #include <linux/syscore_ops.h>
 #include <linux/version.h>
 #include <linux/ctype.h>
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/mempolicy.h>
+#include <linux/sched.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -96,10 +96,8 @@
 int overflowuid = DEFAULT_OVERFLOWUID;
 int overflowgid = DEFAULT_OVERFLOWGID;
 
-#ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);
 EXPORT_SYMBOL(overflowgid);
-#endif
 
 /*
  * the same as above, but for filesystems which can only store a 16-bit
@@ -1663,6 +1661,124 @@ SYSCALL_DEFINE1(umask, int, mask)
 	return mask;
 }
 
+#ifdef CONFIG_CHECKPOINT_RESTORE
+static int prctl_set_mm(int opt, unsigned long addr,
+			unsigned long arg4, unsigned long arg5)
+{
+	unsigned long rlim = rlimit(RLIMIT_DATA);
+	unsigned long vm_req_flags;
+	unsigned long vm_bad_flags;
+	struct vm_area_struct *vma;
+	int error = 0;
+	struct mm_struct *mm = current->mm;
+
+	if (arg4 | arg5)
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (addr >= TASK_SIZE)
+		return -EINVAL;
+
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, addr);
+
+	if (opt != PR_SET_MM_START_BRK && opt != PR_SET_MM_BRK) {
+		/* It must be existing VMA */
+		if (!vma || vma->vm_start > addr)
+			goto out;
+	}
+
+	error = -EINVAL;
+	switch (opt) {
+	case PR_SET_MM_START_CODE:
+	case PR_SET_MM_END_CODE:
+		vm_req_flags = VM_READ | VM_EXEC;
+		vm_bad_flags = VM_WRITE | VM_MAYSHARE;
+
+		if ((vma->vm_flags & vm_req_flags) != vm_req_flags ||
+		    (vma->vm_flags & vm_bad_flags))
+			goto out;
+
+		if (opt == PR_SET_MM_START_CODE)
+			mm->start_code = addr;
+		else
+			mm->end_code = addr;
+		break;
+
+	case PR_SET_MM_START_DATA:
+	case PR_SET_MM_END_DATA:
+		vm_req_flags = VM_READ | VM_WRITE;
+		vm_bad_flags = VM_EXEC | VM_MAYSHARE;
+
+		if ((vma->vm_flags & vm_req_flags) != vm_req_flags ||
+		    (vma->vm_flags & vm_bad_flags))
+			goto out;
+
+		if (opt == PR_SET_MM_START_DATA)
+			mm->start_data = addr;
+		else
+			mm->end_data = addr;
+		break;
+
+	case PR_SET_MM_START_STACK:
+
+#ifdef CONFIG_STACK_GROWSUP
+		vm_req_flags = VM_READ | VM_WRITE | VM_GROWSUP;
+#else
+		vm_req_flags = VM_READ | VM_WRITE | VM_GROWSDOWN;
+#endif
+		if ((vma->vm_flags & vm_req_flags) != vm_req_flags)
+			goto out;
+
+		mm->start_stack = addr;
+		break;
+
+	case PR_SET_MM_START_BRK:
+		if (addr <= mm->end_data)
+			goto out;
+
+		if (rlim < RLIM_INFINITY &&
+		    (mm->brk - addr) +
+		    (mm->end_data - mm->start_data) > rlim)
+			goto out;
+
+		mm->start_brk = addr;
+		break;
+
+	case PR_SET_MM_BRK:
+		if (addr <= mm->end_data)
+			goto out;
+
+		if (rlim < RLIM_INFINITY &&
+		    (addr - mm->start_brk) +
+		    (mm->end_data - mm->start_data) > rlim)
+			goto out;
+
+		mm->brk = addr;
+		break;
+
+	default:
+		error = -EINVAL;
+		goto out;
+	}
+
+	error = 0;
+
+out:
+	up_read(&mm->mmap_sem);
+
+	return error;
+}
+#else /* CONFIG_CHECKPOINT_RESTORE */
+static int prctl_set_mm(int opt, unsigned long addr,
+			unsigned long arg4, unsigned long arg5)
+{
+	return -EINVAL;
+}
+#endif
+
 
 static int prctl_update_vma_anon_name(struct vm_area_struct *vma,
 		struct vm_area_struct **prev,
@@ -1807,6 +1923,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
 	struct task_struct *me = current;
+	struct task_struct *tsk;
 	unsigned char comm[sizeof(me->comm)];
 	long error;
 
@@ -1951,9 +2068,50 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			else
 				error = PR_MCE_KILL_DEFAULT;
 			break;
+		case PR_SET_MM:
+			error = prctl_set_mm(arg2, arg3, arg4, arg5);
+			break;
+		case PR_SET_CHILD_SUBREAPER:
+			me->signal->is_child_subreaper = !!arg2;
+			error = 0;
+			break;
+		case PR_GET_CHILD_SUBREAPER:
+			error = put_user(me->signal->is_child_subreaper,
+					 (int __user *) arg2);
+			break;
 		case PR_SET_VMA:
 			error = prctl_set_vma(arg2, arg3, arg4, arg5);
 			break;
+		case PR_SET_TIMERSLACK_PID:
+			if (current->pid != (pid_t)arg3 &&
+					!capable(CAP_SYS_NICE))
+				return -EPERM;
+			rcu_read_lock();
+			tsk = find_task_by_pid_ns((pid_t)arg3, &init_pid_ns);
+			if (tsk == NULL) {
+				rcu_read_unlock();
+				return -EINVAL;
+			}
+			get_task_struct(tsk);
+			rcu_read_unlock();
+			if (arg2 <= 0)
+				tsk->timer_slack_ns =
+					tsk->default_timer_slack_ns;
+			else
+				tsk->timer_slack_ns = arg2;
+			put_task_struct(tsk);
+			error = 0;
+			break;
+		case PR_SET_NO_NEW_PRIVS:
+			if (arg2 != 1 || arg3 || arg4 || arg5)
+				return -EINVAL;
+
+			current->no_new_privs = 1;
+			break;
+		case PR_GET_NO_NEW_PRIVS:
+			if (arg2 || arg3 || arg4 || arg5)
+				return -EINVAL;
+			return current->no_new_privs ? 1 : 0;
 		default:
 			error = -EINVAL;
 			break;
