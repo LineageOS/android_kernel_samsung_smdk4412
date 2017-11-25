@@ -698,6 +698,15 @@ struct input_keymap_entry {
 
 #define KEY_FAKE_PWR		0x240 /* Fake Power off flag*/
 
+/*
+ * S-Pen Gestures
+ */
+#define KEY_PEN_DTU			0x2f1
+#define KEY_PEN_UTD			0x2f2
+#define KEY_PEN_RTL			0x2f3
+#define KEY_PEN_LTR			0x2f4
+#define KEY_PEN_LP			0x2f5
+
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
