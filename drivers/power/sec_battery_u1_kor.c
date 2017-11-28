@@ -2002,11 +2002,9 @@ static int sec_bat_read_proc(char *buf, char **start,
 {
 	struct sec_bat_info *info = data;
 	struct timespec cur_time;
-	ktime_t ktime;
 	int len = 0;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&cur_time);
 
 	len = sprintf(buf, "%lu	%u	%u	%u	%u	"
 			"%u	%d	%d	%d	%d	"

@@ -461,14 +461,12 @@ static u32 get_charger_status(struct battery_data *battery)
 static int is_over_abs_time(struct battery_data *battery)
 {
 	unsigned int total_time;
-	ktime_t ktime;
 	struct timespec cur_time;
 
 	if (!battery->charging_start_time)
 		return 0;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&cur_time);
 
 	if (battery->info.batt_is_recharging)
 		total_time = battery->pdata->recharge_duration;
@@ -767,11 +765,9 @@ static bool check_UV_charging_case(void)
 static void sec_set_time_for_charging(struct battery_data *battery, int mode)
 {
 	if (mode) {
-		ktime_t ktime;
 		struct timespec cur_time;
 
-		ktime = alarm_get_elapsed_realtime();
-		cur_time = ktime_to_timespec(ktime);
+		get_monotonic_boottime(&cur_time);
 
 		/* record start time for abs timer */
 		battery->charging_start_time = cur_time.tv_sec;

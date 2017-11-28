@@ -3046,8 +3046,7 @@ static int sec_bat_read_proc(char *buf, char **start,
 	ktime_t ktime;
 	int len = 0;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+        get_monotonic_boottime(&cur_time);
 
 #ifdef CONFIG_TARGET_LOCALE_NA
 	len = sprintf(buf,

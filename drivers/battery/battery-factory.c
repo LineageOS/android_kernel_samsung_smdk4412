@@ -532,13 +532,11 @@ int battery_info_proc(char *buf, char **start,
 {
 	struct battery_info *info = data;
 	struct timespec cur_time;
-	ktime_t ktime;
 	int len = 0;
 	/* Guess we need no more than 100 bytes. */
 	int size = 100;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&cur_time);
 
 	len = snprintf(buf, size,
 		"%lu\t%u\t%u\t%u\t%u\t%d\t%u\t%d\t%d\t%u\t"
@@ -570,13 +568,11 @@ int battery_info_proc(char *buf, char **start,
 {
 	struct battery_info *info = data;
 	struct timespec cur_time;
-	ktime_t ktime;
 	int len = 0;
 	/* Guess we need no more than 100 bytes. */
 	int size = 100;
 
-	ktime = alarm_get_elapsed_realtime();
-	cur_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&cur_time);
 
 	len = snprintf(buf, size,
 		"%lu\t%u\t%u\t%u\t%u\t%u\t%d\t%d\t%u\t"

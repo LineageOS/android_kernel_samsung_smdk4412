@@ -753,13 +753,12 @@ static bool battery_recharge_cond(struct battery_info *info)
 static bool battery_abstimer_cond(struct battery_info *info)
 {
 	unsigned int abstimer_duration;
-	ktime_t ktime;
 	struct timespec current_time;
 	pr_debug("%s\n", __func__);
 
 	/* always update time for info data */
-	ktime = alarm_get_elapsed_realtime();
-	info->current_time = current_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&current_time);
+	info->current_time = current_time;
 
 	if ((info->cable_type == POWER_SUPPLY_TYPE_USB) ||
 		(info->full_charged_state != STATUS_NOT_FULL) ||
@@ -1067,14 +1066,12 @@ static void battery_charge_control(struct battery_info *info,
 				unsigned int chg_curr, unsigned int in_curr)
 {
 	int charge_state;
-	ktime_t ktime;
 	struct timespec current_time;
 	pr_debug("%s, chg(%d), in(%d)\n", __func__, chg_curr, in_curr);
 
 	mutex_lock(&info->ops_lock);
 
-	ktime = alarm_get_elapsed_realtime();
-	current_time = ktime_to_timespec(ktime);
+	get_monotonic_boottime(&current_time);
 
 	if ((info->cable_type != POWER_SUPPLY_TYPE_BATTERY) &&
 		(chg_curr > 0) && (info->siop_state == true)) {
