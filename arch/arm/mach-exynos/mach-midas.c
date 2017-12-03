@@ -946,7 +946,9 @@ static void motor_en(bool enable)
 	       gpio_get_value(EXYNOS4_GPD0(0)));
 }
 #endif
-#if defined(CONFIG_MACH_T0) && defined(CONFIG_TARGET_LOCALE_KOR)
+
+// Needed for T0LTE Korean variants
+#if defined(CONFIG_MACH_T0_LTE)
 static void motor_en(bool enable)
 {
 	gpio_direction_output(EXYNOS4_GPC0(3), enable);
@@ -3038,7 +3040,8 @@ static void __init midas_machine_init(void)
 	defined(CONFIG_MACH_M0) || \
 	defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_T0) ||\
 	defined(CONFIG_MACH_BAFFIN)
-#if defined(CONFIG_MACH_T0) && defined(CONFIG_TARGET_LOCALE_KOR)
+// Needed for T0LTE Korean variants
+#if defined(CONFIG_MACH_T0_LTE)
 	if (system_rev >= 9)
 		max77693_haptic_pdata.motor_en = motor_en;
 #endif
