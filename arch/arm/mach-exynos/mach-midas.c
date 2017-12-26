@@ -2946,8 +2946,16 @@ static void __init midas_machine_init(void)
 #endif
 
 #ifdef CONFIG_LEDS_AAT1290A
+#ifndef CONFIG_MACH_T0_LTE
+	platform_device_register(&s3c_device_aat1290a_led);
+#else
+// t0ltedcm uses aat1290a led, check system_rev to exclude other variants
+	if (system_rev >= 12)
 	platform_device_register(&s3c_device_aat1290a_led);
 #endif
+#endif
+
+
 
 #ifdef CONFIG_S3C_DEV_I2C4
 #if defined(CONFIG_MACH_T0)
@@ -3005,6 +3013,13 @@ static void __init midas_machine_init(void)
 #if !defined(CONFIG_MACH_GC1) && !defined(CONFIG_LEDS_AAT1290A)
 	gpio_request(GPIO_3_TOUCH_INT, "3_TOUCH_INT");
 	s5p_register_gpio_interrupt(GPIO_3_TOUCH_INT);
+#endif
+
+#if defined(CONFIG_MACH_T0_LTE)
+	if (system_rev < 12) {
+	gpio_request(GPIO_3_TOUCH_INT, "3_TOUCH_INT");
+	s5p_register_gpio_interrupt(GPIO_3_TOUCH_INT);
+	}
 #endif
 
 	i2c_register_board_info(9, i2c_devs9_emul, ARRAY_SIZE(i2c_devs9_emul));

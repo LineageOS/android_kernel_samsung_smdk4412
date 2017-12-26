@@ -1794,6 +1794,13 @@ static void __init midas_machine_init(void)
 	s5p_register_gpio_interrupt(GPIO_3_TOUCH_INT);
 #endif
 
+#ifdef CONFIG_MACH_T0_LTE
+	if (system_rev < 12) {
+	gpio_request(GPIO_3_TOUCH_INT, "3_TOUCH_INT");
+	s5p_register_gpio_interrupt(GPIO_3_TOUCH_INT);
+	}
+#endif
+
 	i2c_register_board_info(9, i2c_devs9_emul, ARRAY_SIZE(i2c_devs9_emul));
 
 	i2c_register_board_info(10, i2c_devs10_emul,
