@@ -3,8 +3,19 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+#ifdef CONFIG_BATTERY_SEC_U1
+extern int poweroff_charging;
+#endif
+
 static int cmdline_proc_show(struct seq_file *m, void *v)
 {
+#ifdef CONFIG_BATTERY_SEC_U1
+	if (poweroff_charging) {
+		seq_printf(m, "%s %s\n", saved_command_line,
+				"androidboot.mode=charger");
+		return 0;
+	}
+#endif
 	seq_printf(m, "%s\n", saved_command_line);
 	return 0;
 }
