@@ -399,6 +399,8 @@ static enum power_supply_property sec_power_props[] = {
 static struct sec_bat_info *pchg;
 #endif
 
+int poweroff_charging;
+
 struct power_supply *get_power_supply_by_name(char *name)
 {
 	if (!name)
@@ -3235,7 +3237,7 @@ static __devinit int sec_bat_probe(struct platform_device *pdev)
 	info->event_expired_time = 0xFFFFFFFF;
 #endif
 	if (info->get_lpcharging_state) {
-		if (info->get_lpcharging_state())
+		if (poweroff_charging = info->get_lpcharging_state())
 			info->polling_interval = POLLING_INTERVAL / 4;
 		else
 			info->polling_interval = POLLING_INTERVAL;
