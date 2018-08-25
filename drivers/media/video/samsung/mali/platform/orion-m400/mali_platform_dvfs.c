@@ -1,4 +1,7 @@
-/* * Copyright (C) 2010-2012 ARM Limited. All rights reserved. * * This program is free software and is provided to you under the terms of the GNU General Public License version 2
+/*
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
+ *
+ * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
  *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
@@ -60,15 +63,13 @@ typedef struct mali_dvfs_staycount{
 }mali_dvfs_staycount_table;
 
 mali_dvfs_staycount_table mali_dvfs_staycount[MALI_DVFS_STEPS]={
-    /*step 0*/{1},
-    /*step 1*/{1},
-    /*step 2*/{1} };
+	/*step 0*/{1},
+	/*step 1*/{1},};
 
 /*dvfs threshold*/
 mali_dvfs_threshold_table mali_dvfs_threshold[MALI_DVFS_STEPS]={
-    /*step 0*/{((int)((255*0)/100))   ,((int)((255*85)/100))},
-    /*step 1*/{((int)((255*75)/100))  ,((int)((255*85)/100))},
-    /*step 2*/{((int)((255*75)/100))  ,((int)((255*100)/100))} };
+	/*step 0*/{((int)((255*0)/100)), ((int)((255*85)/100))},
+	/*step 1*/{((int)((255*75)/100)), ((int)((255*100)/100))} };
 
 /*dvfs status*/
 mali_dvfs_currentstatus maliDvfsStatus;
@@ -76,38 +77,33 @@ int mali_dvfs_control=0;
 
 /*dvfs table*/
 mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
-#ifdef CONFIG_EXYNOS4210_1400MHZ_SUPPORT
-			/*step 0*/{134  ,1000000    , 950000},
-#else
-			/*step 0*/{100  ,1000000    , 950000},
-#endif
-			/*step 1*/{160  ,1000000    , 950000},
-			/*step 2*/{267  ,1000000    ,1000000} };
+	/*step 0*/{160  ,1000000    , 950000},
+	/*step 1*/{267  ,1000000    ,1000000} };
 
 #ifdef EXYNOS4_ASV_ENABLED
 
-#define ASV_8_LEVEL 8
-#define ASV_5_LEVEL 5
+#define ASV_8_LEVEL	8
+#define ASV_5_LEVEL	5
 
 static unsigned int asv_3d_volt_5_table[ASV_5_LEVEL][MALI_DVFS_STEPS] = {
-	/* L3 (100/134MHz) L2(160MHz), L1(267MHz) */
-	{1000000, 1000000, 1100000},	/* S */
-	{1000000, 1000000, 1100000},	/* A */
-	{ 950000,  950000, 1000000},	/* B */
-	{ 950000,  950000, 1000000},	/* C */
-	{ 950000,  950000,  950000},	/* D */
+	/* L3(160MHz), L2(266MHz) */
+	{1000000, 1100000},	/* S */
+	{1000000, 1100000},	/* A */
+	{ 950000, 1000000},	/* B */
+	{ 950000, 1000000},	/* C */
+	{ 950000,  950000},	/* D */
 };
 
 static unsigned int asv_3d_volt_8_table[ASV_8_LEVEL][MALI_DVFS_STEPS] = {
-	/* L3 (100/134MHz) L2(160MHz), L1(267MHz) */
-	{1000000, 1000000, 1100000},	/* SS */
-	{1000000, 1000000, 1100000},	/* A1 */
-	{1000000, 1000000, 1100000},	/* A2 */
-	{ 950000,  950000, 1000000},	/* B1 */
-	{ 950000,  950000, 1000000},	/* B2 */
-	{ 950000,  950000, 1000000},	/* C1 */
-	{ 950000,  950000, 1000000},	/* C2 */
-	{ 950000,  950000,  950000},	/* D1 */
+	/* L3(160MHz), L2(266MHz)) */
+	{1000000, 1100000},	/* SS */
+	{1000000, 1100000},	/* A1 */
+	{1000000, 1100000},	/* A2 */
+	{ 950000, 1000000},	/* B1 */
+	{ 950000, 1000000},	/* B2 */
+	{ 950000, 1000000},	/* C1 */
+	{ 950000, 1000000},	/* C2 */
+	{ 950000,  950000},	/* D1 */
 };
 #endif
 
@@ -219,50 +215,20 @@ static unsigned int decideNextStatus(unsigned int utilization)
 #if MALI_GPU_BOTTOM_LOCK
 		if (_mali_osk_atomic_read(&bottomlock_status) > 0)
 			level = 1;	/* or bigger */
-		else
+		else if (utilization > mali_dvfs_threshold[maliDvfsStatus.currentStep].upthreshold)
+#else
+		if (utilization > mali_dvfs_threshold[maliDvfsStatus.currentStep].upthreshold)
 #endif
-		switch(maliDvfsStatus.currentStep)
-		{
-			case 0:
-				if( utilization > mali_dvfs_threshold[maliDvfsStatus.currentStep].upthreshold)
-					level=1;
-				else
-					level = maliDvfsStatus.currentStep;
-				break;
-			case 1:
-				if( utilization > mali_dvfs_threshold[maliDvfsStatus.currentStep].upthreshold)
-					level=2;
-				else if( utilization <
-					 (mali_dvfs_threshold[maliDvfsStatus.currentStep].downthreshold*mali_dvfs[maliDvfsStatus.currentStep-1].clock)/
-					 mali_dvfs[maliDvfsStatus.currentStep].clock)
-					level=0;
-				else
-					level = maliDvfsStatus.currentStep;
-				break;
-			case 2:
-				if( utilization <
-				         (mali_dvfs_threshold[maliDvfsStatus.currentStep].downthreshold*mali_dvfs[maliDvfsStatus.currentStep-1].clock)/
-					 mali_dvfs[maliDvfsStatus.currentStep].clock)
-					level=1;
-				else
-					level = maliDvfsStatus.currentStep;
-				break;
-		}
-	}
-	else
-	{
-		if((mali_dvfs_control == 1)||(( mali_dvfs_control > 3) && (mali_dvfs_control < mali_dvfs[0].clock+1)))
-		{
-			level=0;
-		}
-		else if((mali_dvfs_control == 2)||(( mali_dvfs_control > mali_dvfs[0].clock) && (mali_dvfs_control < mali_dvfs[1].clock+1)))
-		{
 			level=1;
-		}
+		else if (utilization < mali_dvfs_threshold[maliDvfsStatus.currentStep].downthreshold)
+			level=0;
 		else
-		{
-			level=2;
-		}
+			level = maliDvfsStatus.currentStep;
+	} else	{
+		if ((mali_dvfs_control > 0) && (mali_dvfs_control < mali_dvfs[1].clock))
+			level=0;
+		else
+			level=1;
 	}
 
 	return level;

@@ -570,6 +570,12 @@ int mfc_init_mem_mgr(struct mfc_dev *dev)
 	cma_infos[0].total_size  = 0x03100000;
 	cma_infos[0].free_size	 = 0x03100000;
 	cma_infos[0].count   = 1;
+#else
+	cma_infos[0].lower_bound = 0x5C100000;
+	cma_infos[0].upper_bound = 0x5F200000;
+	cma_infos[0].total_size  = 0x03100000;
+	cma_infos[0].free_size   = 0x03100000;
+	cma_infos[0].count   = 1;
 #endif
 #else
 	if (cma_info(&cma_infos[0], dev->device, "A")) {

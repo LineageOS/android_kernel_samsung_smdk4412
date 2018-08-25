@@ -390,7 +390,7 @@ static int mfc_open(struct inode *inode, struct file *file)
 	ret = mfc_queue_alloc(mfc_ctx);
 	if (ret < 0) {
 		mfc_err("mfc_queue_alloc failed\n");
-		goto err_queue_alloc;
+		goto err_inst_ctx;
 	}
 #endif
 
@@ -401,17 +401,9 @@ static int mfc_open(struct inode *inode, struct file *file)
 
 	return 0;
 
-#ifdef CONFIG_SLP_DMABUF
-err_queue_alloc:
-#endif
 #ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 err_drm_ctx:
 #endif
-	mfcdev->inst_ctx[inst_id] = NULL;
-	atomic_dec(&mfcdev->inst_cnt);
-
-	mfc_destroy_inst(mfc_ctx);
-
 err_inst_ctx:
 err_inst_id:
 err_inst_cnt:
@@ -419,6 +411,15 @@ err_inst_cnt:
 #endif
 err_start_hw:
 	if (atomic_read(&mfcdev->inst_cnt) == 0) {
+#ifdef CONFIG_USE_MFC_CMA
+		size_t size = 0x02800000;
+		dma_free_coherent(mfcdev->device, size, mfcdev->cma_vaddr,
+							mfcdev->cma_dma_addr);
+		printk(KERN_INFO "%s[%d] size 0x%x, vaddr 0x%x, base 0x0%x\n",
+				__func__, __LINE__, (int)size,
+				(int) mfcdev->cma_vaddr,
+				(int)mfcdev->cma_dma_addr);
+#endif
 		if (mfc_power_off() < 0)
 			mfc_err("power disable failed\n");
 	}
@@ -429,16 +430,7 @@ err_pwr_enable:
 #endif
 
 err_fw_state:
-#ifdef CONFIG_USE_MFC_CMA
-    if (atomic_read(&mfcdev->inst_cnt) == 0) {
-		size_t size = 0x02800000;
-		dma_free_coherent(mfcdev->device, size, mfcdev->cma_vaddr,
-							mfcdev->cma_dma_addr);
-		printk(KERN_INFO "%s[%d] size 0x%x, vaddr 0x%x, base 0x0%x\n",
-				__func__, __LINE__, (int)size,
-				(int) mfcdev->cma_vaddr,
-				(int)mfcdev->cma_dma_addr);
-	}
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 #endif
 	mutex_unlock(&mfcdev->lock);
 

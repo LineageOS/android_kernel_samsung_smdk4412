@@ -670,6 +670,8 @@ struct v4l2_buffer {
 /* Cache handling flags */
 #define V4L2_BUF_FLAG_NO_CACHE_INVALIDATE	0x0800
 #define V4L2_BUF_FLAG_NO_CACHE_CLEAN		0x1000
+/* Expects and returns a sync fence */
+#define V4L2_BUF_FLAG_USE_SYNC	0x2000
 
 /*
  *	O V E R L A Y   P R E V I E W
@@ -1136,6 +1138,12 @@ struct v4l2_output {
 struct v4l2_control {
 	__u32		     id;
 	__s32		     value;
+};
+
+struct v4l2_noti_control {
+	__u32			id;
+	__s32			value;
+	__s64			value64;
 };
 
 struct v4l2_ext_control {
@@ -2285,6 +2293,7 @@ struct v4l2_create_buffers {
 #define VIDIOC_S_CTRL		_IOWR('V', 28, struct v4l2_control)
 #define VIDIOC_G_TUNER		_IOWR('V', 29, struct v4l2_tuner)
 #define VIDIOC_S_TUNER		 _IOW('V', 30, struct v4l2_tuner)
+#define VIDIOC_NOTI_CTRL	_IOWR('V', 31, struct v4l2_noti_control)
 #define VIDIOC_G_AUDIO		 _IOR('V', 33, struct v4l2_audio)
 #define VIDIOC_S_AUDIO		 _IOW('V', 34, struct v4l2_audio)
 #define VIDIOC_QUERYCTRL	_IOWR('V', 36, struct v4l2_queryctrl)
