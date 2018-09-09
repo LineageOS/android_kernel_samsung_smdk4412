@@ -13,8 +13,9 @@
 #include <linux/irq.h>
 #include <linux/delay.h>
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/notifier.h>
+#include <linux/fb.h>
 #endif
 
 /* Touchkey Register */
@@ -175,7 +176,10 @@ struct touchkey_platform_data {
 struct touchkey_i2c {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
-	struct early_suspend early_suspend;
+#ifdef CONFIG_FB
+	struct notifier_block fb_notif;
+	bool fb_suspended;
+#endif
 	struct mutex lock;
 	struct device	*dev;
     struct work_struct	work;
