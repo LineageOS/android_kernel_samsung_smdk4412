@@ -47,7 +47,10 @@
 #endif
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/notifier.h>
+#include <linux/fb.h>
+#endif
 #include <linux/suspend.h>
 #endif
 
@@ -546,13 +549,15 @@ void s3cfb_lcd0_pmu_off(void)
 }
 
 #ifdef CONFIG_PM
-#ifdef CONFIG_HAS_EARLYSUSPEND
-void (*lcd_early_suspend)(void);
-void (*lcd_late_resume)(void);
+#ifdef CONFIG_FB
+void (*lcd_fb_suspend)(void);
+void (*lcd_fb_resume)(void);
 
-void s3cfb_early_suspend(struct early_suspend *h)
+void s3cfb_fb_suspend(struct s3cfb_global *info)
 {
-	struct s3cfb_global *info = container_of(h, struct s3cfb_global, early_suspend);
+	if (info->fb_suspended)
+		return;
+
 	struct s3c_platform_fb *pdata = to_fb_plat(info->dev);
 	struct platform_device *pdev = to_platform_device(info->dev);
 	struct s3cfb_global *fbdev[2];
@@ -562,13 +567,13 @@ void s3cfb_early_suspend(struct early_suspend *h)
 
 #ifdef CONFIG_FB_S5P_GD2EVF
 	info->suspend = 1;
-	if (lcd_early_suspend && current_mipi_lcd)
-		lcd_early_suspend();
+	if (lcd_fb_suspend && current_mipi_lcd)
+		lcd_fb_suspend();
 	else
 		gd2evf_power_ext(0);
 #elif defined(CONFIG_FB_S5P_MIPI_DSIM)
-	if (lcd_early_suspend)
-		lcd_early_suspend();
+	if (lcd_fb_suspend)
+		lcd_fb_suspend();
 #endif
 
 	for (i = 0; i < FIMD_MAX; i++) {
@@ -638,12 +643,15 @@ void s3cfb_early_suspend(struct early_suspend *h)
 
 	dev_info(info->dev, "-%s\n", __func__);
 
+	info->fb_suspended = true;
 	return;
 }
 
-void s3cfb_late_resume(struct early_suspend *h)
+void s3cfb_fb_resume(struct s3cfb_global *info)
 {
-	struct s3cfb_global *info = container_of(h, struct s3cfb_global, early_suspend);
+	if (!info->fb_suspended)
+                return;
+
 	struct s3c_platform_fb *pdata = to_fb_plat(info->dev);
 	struct fb_info *fb;
 	struct s3cfb_window *win;
@@ -764,11 +772,41 @@ void s3cfb_late_resume(struct early_suspend *h)
 #endif
 
 	dev_info(info->dev, "-%s\n", __func__);
+	info->fb_suspended = false;
 
 	return;
 }
-#else /* else !CONFIG_HAS_EARLYSUSPEND */
 
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	struct s3cfb_global *info = container_of(self, struct s3cfb_global, fb_notif);
+
+	if (evdata && evdata->data && info) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					s3cfb_fb_resume(info);
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+					s3cfb_fb_suspend(info);
+					break;
+			}
+		}
+	}
+
+	return 0;
+}
+#endif
+
+#ifndef CONFIG_HAS_EARLYSUSPEND
 int s3cfb_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct s3c_platform_fb *pdata = to_fb_plat(&pdev->dev);
@@ -1265,12 +1303,10 @@ static int s3cfb_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_HAS_WAKELOCK
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		fbdev[i]->early_suspend.suspend = s3cfb_early_suspend;
-		fbdev[i]->early_suspend.resume = s3cfb_late_resume;
-		fbdev[i]->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-
-		register_early_suspend(&fbdev[i]->early_suspend);
+#ifdef CONFIG_FB
+		fbdev[i]->fb_suspended = false;
+		fbdev[i]->fb_notif.notifier_call = fb_notifier_callback;
+		fb_register_client(&fbdev[i]->fb_notif);
 #endif
 #endif
 #if defined(CONFIG_FB_S5P_VSYNC_THREAD)
@@ -1375,8 +1411,8 @@ static int s3cfb_remove(struct platform_device *pdev)
 		fbdev[i] = fbfimd->fbdev[i];
 
 #ifdef CONFIG_HAS_WAKELOCK
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		unregister_early_suspend(&fbdev[i]->early_suspend);
+#ifdef CONFIG_FB
+		fb_unregister_client(&fbdev[i]->fb_notif);
 #endif
 #endif
 		free_irq(fbdev[i]->irq, fbdev[i]);
