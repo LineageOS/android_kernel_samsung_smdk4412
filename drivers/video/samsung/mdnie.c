@@ -926,11 +926,15 @@ static struct device_attribute mdnie_attributes[] = {
 };
 
 #ifdef CONFIG_PM
-#if defined(CONFIG_HAS_EARLYSUSPEND)
+#if defined(CONFIG_FB)
 #if defined(CONFIG_FB_MDNIE_PWM)
-static void mdnie_early_suspend(struct early_suspend *h)
+static void mdnie_fb_suspend(struct mdnie_info *mdnie)
 {
-	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
+	if (mdnie->fb_suspended)
+		return;
+
+	mdnie->fb_suspended = true;
+
 	struct lcd_platform_data *pd = mdnie->lcd_pd;
 
 	dev_info(mdnie->dev, "+%s\n", __func__);
@@ -949,9 +953,12 @@ static void mdnie_early_suspend(struct early_suspend *h)
 }
 #endif
 
-static void mdnie_late_resume(struct early_suspend *h)
+static void mdnie_fb_resume(struct mdnie_info *mdnie)
 {
-	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
+	if (!mdnie->fb_suspended)
+		return;
+
+	mdnie->fb_suspended = false;
 #if defined(CONFIG_FB_MDNIE_PWM)
 	struct lcd_platform_data *pd = mdnie->lcd_pd;
 #endif
@@ -980,6 +987,34 @@ static void mdnie_late_resume(struct early_suspend *h)
 	return;
 }
 #endif
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	struct mdnie_info *mdnie = container_of(self, struct mdnie_info, fb_notif);
+	if (evdata && evdata->data && mdnie) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					mdnie_fb_resume(mdnie);
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+#if defined(CONFIG_FB_MDNIE_PWM)
+					mdnie_fb_suspend(mdnie);
+#endif
+					break;
+			}
+		}
+	}
+	return 0;
+}
 #endif
 
 static int mdnie_probe(struct platform_device *pdev)
@@ -1057,13 +1092,10 @@ static int mdnie_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mdnie);
 	dev_set_drvdata(mdnie->dev, mdnie);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#if defined(CONFIG_FB_MDNIE_PWM)
-	mdnie->early_suspend.suspend = mdnie_early_suspend;
-#endif
-	mdnie->early_suspend.resume = mdnie_late_resume;
-	mdnie->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
-	register_early_suspend(&mdnie->early_suspend);
+#ifdef CONFIG_FB
+	mdnie->fb_suspended = false;
+	mdnie->fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&mdnie->fb_notif);
 #endif
 
 
@@ -1145,7 +1177,7 @@ static struct platform_driver mdnie_driver = {
 	},
 	.probe		= mdnie_probe,
 	.remove		= mdnie_remove,
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#ifndef CONFIG_FB
 	.suspend	= mdnie_suspend,
 	.resume		= mdnie_resume,
 #endif
