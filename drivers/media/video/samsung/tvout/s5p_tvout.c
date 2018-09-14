@@ -53,13 +53,16 @@ struct s5p_tvout_vp_bufferinfo s5ptv_vp_buff;
 static struct workqueue_struct *tvout_resume_wq;
 struct work_struct tvout_resume_work;
 #endif
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-static struct early_suspend s5ptv_early_suspend;
+#ifdef CONFIG_FB
+#include <linux/fb.h>
+#include <linux/notifier.h>
+static struct notifier_block fb_notif;
+bool fb_suspended;
 static DEFINE_MUTEX(s5p_tvout_mutex);
-unsigned int suspend_status;
-static void s5p_tvout_early_suspend(struct early_suspend *h);
-static void s5p_tvout_late_resume(struct early_suspend *h);
+static void s5p_tvout_fb_suspend();
+static void s5p_tvout_fb_resume();
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data);
 #endif
 bool flag_after_resume;
 
@@ -336,13 +339,11 @@ static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 	if (s5p_tvout_v4l2_constructor(pdev) < 0)
 		goto err_v4l2;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_FB
 	spin_lock_init(&s5ptv_status.tvout_lock);
-	s5ptv_early_suspend.suspend = s5p_tvout_early_suspend;
-	s5ptv_early_suspend.resume = s5p_tvout_late_resume;
-	s5ptv_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 4;
-	register_early_suspend(&s5ptv_early_suspend);
-	suspend_status = 0;
+	fb_suspended = false;
+	fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&fb_notif);
 #endif
 
 #ifdef CONFIG_TV_FB
@@ -511,8 +512,8 @@ static int s5p_tvout_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void s5p_tvout_early_suspend(struct early_suspend *h)
+#ifdef CONFIG_FB
+static void s5p_tvout_fb_suspend()
 {
 	tvout_dbg("\n");
 #ifdef CLOCK_GATING_ON_EARLY_SUSPEND
@@ -522,17 +523,17 @@ static void s5p_tvout_early_suspend(struct early_suspend *h)
 	s5p_vp_ctrl_suspend();
 	s5p_mixer_ctrl_suspend();
 	s5p_tvif_ctrl_suspend();
-	suspend_status = 1;
-	tvout_dbg("suspend_status is true\n");
+	fb_suspended = true;
+	tvout_dbg("fb_suspended is true\n");
 	mutex_unlock(&s5p_tvout_mutex);
 #else
-	suspend_status = 1;
+	fb_suspended = true;
 #endif
 
 	return;
 }
 
-static void s5p_tvout_late_resume(struct early_suspend *h)
+static void s5p_tvout_fb_resume()
 {
 	tvout_dbg("\n");
 
@@ -545,8 +546,8 @@ static void s5p_tvout_late_resume(struct early_suspend *h)
 		flag_after_resume = false;
 	}
 #endif
-	suspend_status = 0;
-	tvout_dbg("suspend_status is false\n");
+	fb_suspended = false;
+	tvout_dbg("fb_suspended is false\n");
 
 	s5p_tvif_ctrl_resume();
 	s5p_mixer_ctrl_resume();
@@ -556,7 +557,7 @@ static void s5p_tvout_late_resume(struct early_suspend *h)
 		s5p_mixer_ctrl_get_vsync_interrupt());
 	mutex_unlock(&s5p_tvout_mutex);
 #else
-	suspend_status = 0;
+	fb_suspended = false;
 #endif
 
 	return;
@@ -571,20 +572,45 @@ void s5p_tvout_mutex_unlock()
 {
 	mutex_unlock(&s5p_tvout_mutex);
 }
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	if (evdata && evdata->data) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					s5p_tvout_fb_resume();
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+					s5p_tvout_fb_suspend();
+					break;
+			}
+		}
+	}
+	return 0;
+}
 #endif
 
 static void s5p_tvout_resume_work(void *arg)
 {
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_FB
 	mutex_lock(&s5p_tvout_mutex);
 #endif
 	s5p_hdmi_ctrl_phy_power_resume();
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_FB
 	mutex_unlock(&s5p_tvout_mutex);
 #endif
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_FB
 static int s5p_tvout_suspend(struct device *dev)
 {
 	tvout_dbg("\n");
@@ -686,7 +712,7 @@ static int __init s5p_tvout_init(void)
 
 static void __exit s5p_tvout_exit(void)
 {
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_FB
 	mutex_destroy(&s5p_tvout_mutex);
 #endif
 	platform_driver_unregister(&s5p_tvout_driver);

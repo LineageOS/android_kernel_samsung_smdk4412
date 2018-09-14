@@ -265,8 +265,8 @@ extern void s5p_hdmi_ctrl_clock(bool on);
 extern bool on_stop_process;
 extern bool on_start_process;
 extern struct s5p_tvout_vp_bufferinfo s5ptv_vp_buff;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-extern unsigned int suspend_status;
+#ifdef CONFIG_FB
+extern bool fb_suspended;
 extern int s5p_hpd_get_status(void);
 extern void s5p_tvout_mutex_lock(void);
 extern void s5p_tvout_mutex_unlock(void);

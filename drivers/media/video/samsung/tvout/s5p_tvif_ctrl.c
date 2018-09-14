@@ -2462,8 +2462,8 @@ void s5p_hdmi_ctrl_stop(void)
 	if (ctrl->running) {
 		ctrl->running = false;
 #ifdef CLOCK_GATING_ON_EARLY_SUSPEND
-		if (suspend_status) {
-			tvout_dbg("driver is suspend_status\n");
+		if (fb_suspended) {
+			tvout_dbg("driver is fb_suspended\n");
 		} else
 #endif
 		{
@@ -2696,8 +2696,8 @@ static int s5p_tvif_ctrl_internal_stop(void)
 	case TVOUT_HDMI_RGB:
 		s5p_hdmi_ctrl_stop();
 #ifdef CLOCK_GATING_ON_EARLY_SUSPEND
-		if (suspend_status) {
-			tvout_dbg("driver is suspend_status\n");
+		if (fb_suspended) {
+			tvout_dbg("driver is fb_suspended\n");
 		} else
 #endif
 		{
@@ -2914,8 +2914,8 @@ int s5p_tvif_ctrl_start(
 	}
 
 #ifdef CLOCK_GATING_ON_EARLY_SUSPEND
-	if (suspend_status) {
-		tvout_dbg("driver is suspend_status\n");
+	if (fb_suspended) {
+		tvout_dbg("driver is fb_suspended\n");
 	} else
 #endif
 	{
