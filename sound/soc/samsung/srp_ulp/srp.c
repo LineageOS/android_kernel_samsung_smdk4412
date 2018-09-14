@@ -30,8 +30,9 @@
 #include <linux/irq.h>
 #include <linux/uaccess.h>
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/fb.h>
+#include <linux/notifier.h>
 #endif
 
 #if defined(CONFIG_S5P_MEM_CMA)
@@ -170,9 +171,9 @@ struct srp_info {
 	unsigned long gain_subr;		/* Gain sub right */
 	int dram_in_use;			/* DRAM is accessed by SRP */
 	int op_mode;				/* Operation mode: typeA/B/C */
-	int early_suspend_entered;		/* Early suspend state */
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
+	bool fb_suspended;			/* Suspend state */
+#ifdef CONFIG_FB
+	struct notifier_block fb_notif;
 #endif
 
 	unsigned char *fw_code_vliw;		/* VLIW */
@@ -846,7 +847,7 @@ static ssize_t srp_write(struct file *file, const char *buffer,
 	srp.wbuf_fill_size += size;
 	if (srp.wbuf_pos < srp.ibuf_size) {
 		frame_idx = readl(srp.commbox + SRP_FRAME_INDEX);
-		while (!srp.early_suspend_entered &&
+		while (!srp.fb_suspended &&
 			srp.decoding_started && srp.is_running) {
 			if (readl(srp.commbox + SRP_READ_BITSTREAM_SIZE)
 				+ srp.ibuf_size * 2 >= srp.wbuf_fill_size)
@@ -1305,7 +1306,7 @@ static long srp_ctrl_ioctl(struct file *file, unsigned int cmd,
 
 #ifdef _USE_PCM_DUMP_
 	case SRP_CTRL_PCM_DUMP_OP:
-		if (arg == 1 && srp.early_suspend_entered == 0) {
+		if (arg == 1 && srp.fb_suspended == 0) {
 			srp.pcm_dump_cnt++;
 			if (srp.pcm_dump_cnt == 1)
 				srp_set_pcm_dump(1);
@@ -1682,28 +1683,60 @@ static struct miscdevice srp_ctrl_miscdev = {
 	.fops		= &srp_ctrl_fops,
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-void srp_early_suspend(struct early_suspend *h)
+#ifdef CONFIG_FB
+void srp_fb_suspend()
 {
-	s5pdbg("early_suspend\n");
+	s5pdbg("fb_suspend\n");
 
-	srp.early_suspend_entered = 1;
+	if (srp.fb_suspended)
+		return;
+
+	srp.fb_suspended = 1;
 	if (srp.is_opened) {
 		if (srp.pcm_dump_cnt > 0)
 			srp_set_pcm_dump(0);
 	}
 }
 
-void srp_late_resume(struct early_suspend *h)
+void srp_fb_resume()
 {
-	s5pdbg("late_resume\n");
+	s5pdbg("fb_resume\n");
 
-	srp.early_suspend_entered = 0;
+
+	if (!srp.fb_suspended)
+		return;
+
+	srp.fb_suspended = 0;
 
 	if (srp.is_opened) {
 		if (srp.pcm_dump_cnt > 0)
 			srp_set_pcm_dump(1);
 	}
+}
+
+int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	if (evdata && evdata->data) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					srp_fb_resume();
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+					srp_fb_suspend();
+					break;
+			}
+		}
+	}
+	return 0;
 }
 #endif
 
@@ -1756,12 +1789,10 @@ static int __init srp_probe(struct platform_device *pdev)
 		goto err4;
 	}
 
-	srp.early_suspend_entered = 0;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	srp.early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
-	srp.early_suspend.suspend = srp_early_suspend;
-	srp.early_suspend.resume = srp_late_resume;
-	register_early_suspend(&srp.early_suspend);
+	srp.fb_suspended = false;
+#ifdef CONFIG_FB	
+	srp.fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&srp.fb_notif);
 #endif
 
 	/* Allocate Firmware buffer */
