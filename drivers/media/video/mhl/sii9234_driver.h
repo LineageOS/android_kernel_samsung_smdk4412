@@ -559,9 +559,9 @@ struct sii9234_data {
 	struct work_struct extcon_wq;
 	bool extcon_attached;
 #endif
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
-	bool suspend_state;
+#ifdef CONFIG_FB
+	struct notifier_block fb_notif;
+	bool fb_suspended;
 #endif
 #ifdef __CONFIG_TMDS_OFFON_WORKAROUND__
 	bool tmds_state;

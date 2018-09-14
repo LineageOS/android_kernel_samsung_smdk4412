@@ -40,7 +40,10 @@
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
 #include <linux/wakelock.h>
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/fb.h>
+#include <linux/notifier.h>
+#endif
 #include <linux/hrtimer.h>
 #ifdef CONFIG_EXTCON
 #include <linux/extcon.h>
@@ -3837,33 +3840,61 @@ static int sii9234_extcon_notifier(struct notifier_block *self,
 #endif
 
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void sii9234_early_suspend(struct early_suspend *early_sus)
+#ifdef CONFIG_FB
+static void sii9234_fb_suspend(struct sii9234_data *sii9234)
 {
-	struct sii9234_data *sii9234 = container_of(early_sus,
-			struct sii9234_data, early_suspend);
+	if (sii9234->fb_suspended)
+		return;
+
+	sii9234->fb_suspended = true;
 
 	pr_debug("%s()\n", __func__);
 	if (!sii9234 || !sii9234->pdata)
 		return;
 
 	sii9234_mutex_lock(&sii9234->lock);
-	sii9234->suspend_state = true;
+	sii9234->fb_suspended = true;
 	sii9234_mutex_unlock(&sii9234->lock);
 }
 
-static void sii9234_late_resume(struct early_suspend *early_sus)
+static void sii9234_fb_resume(struct sii9234_data *sii9234)
 {
-	struct sii9234_data *sii9234 = container_of(early_sus,
-			struct sii9234_data, early_suspend);
+	if (!sii9234->fb_suspended)
+		return;
 
 	pr_debug("%s()\n", __func__);
 	if (!sii9234 || !sii9234->pdata)
 		return;
 
 	sii9234_mutex_lock(&sii9234->lock);
-	sii9234->suspend_state = false;
+	sii9234->fb_suspended = false;
 	sii9234_mutex_unlock(&sii9234->lock);
+}
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	struct sii9234_data *sii9234 = container_of(self, struct sii9234_data, fb_notif);
+	if (evdata && evdata->data && sii9234) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					sii9234_fb_resume(sii9234);
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+					sii9234_fb_suspend(sii9234);
+					break;
+			}
+		}
+	}
+	return 0;
 }
 #endif
 
@@ -4052,12 +4083,10 @@ static int __devinit sii9234_mhl_tx_i2c_probe(struct i2c_client *client,
 	}
 #endif
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	sii9234->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 5;
-	sii9234->early_suspend.suspend = sii9234_early_suspend;
-	sii9234->early_suspend.resume = sii9234_late_resume;
-	register_early_suspend(&sii9234->early_suspend);
-	sii9234->suspend_state = false;
+#ifdef CONFIG_FB
+	sii9234->fb_suspended = false;
+	sii9234->fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&sii9234->fb_notif);
 #endif
 #ifdef __CONFIG_TMDS_OFFON_WORKAROUND__
 	sii9234->tmds_state = 0;
