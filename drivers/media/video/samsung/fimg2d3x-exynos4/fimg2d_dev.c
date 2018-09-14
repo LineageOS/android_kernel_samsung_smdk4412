@@ -390,11 +390,10 @@ static int g2d_probe(struct platform_device *pdev)
 
 	mutex_init(&g2d_dev->lock);
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	g2d_dev->early_suspend.suspend = g2d_early_suspend;
-	g2d_dev->early_suspend.resume = g2d_late_resume;
-	g2d_dev->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-	register_early_suspend(&g2d_dev->early_suspend);
+#if defined(CONFIG_FB)
+	g2d_dev->fb_suspended = false;
+	g2d_dev->fb_notif.notifier_call = fb_notifier_callback;
+	fb_register_client(&g2d_dev->fb_notif);
 #endif
 
 	g2d_dev->dev = &pdev->dev;
@@ -457,8 +456,8 @@ static int g2d_remove(struct platform_device *dev)
 
 	mutex_destroy(&g2d_dev->lock);
 	
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&g2d_dev->early_suspend);
+#if defined(CONFIG_FB)
+	fb_unregister_client(&g2d_dev->fb_notif);
 #endif
 
 	kfree(g2d_dev);
@@ -474,9 +473,13 @@ static int g2d_remove(struct platform_device *dev)
 	return 0;
 }
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-void g2d_early_suspend(struct early_suspend *h)
+#if defined(CONFIG_FB)
+void g2d_fb_suspend()
 {
+	if (g2d_dev->fb_suspended)
+		return;
+
+	g2d_dev->fb_suspended = true;
 	int i = 0;
 
 	atomic_set(&g2d_dev->ready_to_run, 0);
@@ -506,8 +509,12 @@ void g2d_early_suspend(struct early_suspend *h)
 #endif
 }
 
-void g2d_late_resume(struct early_suspend *h)
+void g2d_fb_resume()
 {
+	if (!g2d_dev->fb_suspended)
+		return;
+
+	g2d_dev->fb_suspended = false;
 
 #if defined(CONFIG_EXYNOS_DEV_PD)
 	/* enable the power domain */
@@ -519,9 +526,34 @@ void g2d_late_resume(struct early_suspend *h)
 	atomic_set(&g2d_dev->ready_to_run, 1);
 
 }
+
+static int fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	if (evdata && evdata->data) {
+		if (event == FB_EVENT_BLANK) {
+			blank = evdata->data;
+			switch (*blank) {
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					g2d_fb_resume();
+					break;
+				default:
+				case FB_BLANK_POWERDOWN:
+					g2d_fb_suspend();
+					break;
+			}
+		}
+	}
+	return 0;
+}
 #endif
 
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
+#if !defined(CONFIG_FB)
 static int g2d_suspend(struct platform_device *dev, pm_message_t state)
 {
 	int i = 0;
@@ -592,7 +624,7 @@ static const struct dev_pm_ops g2d_pm_ops = {
 static struct platform_driver fimg2d_driver = {
 	.probe		= g2d_probe,
 	.remove		= g2d_remove,
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
+#if !defined(CONFIG_FB)
 	.suspend	= g2d_suspend,
 	.resume		= g2d_resume,
 #endif
