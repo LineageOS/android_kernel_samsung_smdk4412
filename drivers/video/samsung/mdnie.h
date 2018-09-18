@@ -1,8 +1,9 @@
 #ifndef __MDNIE_H__
 #define __MDNIE_H__
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
+#ifdef CONFIG_FB
+#include <linux/fb.h>
+#include <linux/notifier.h>
 #endif
 
 #define END_SEQ			0xffff
@@ -117,8 +118,9 @@ struct mdnie_info {
 	enum CABC cabc;
 	unsigned int tunning;
 	unsigned int negative;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend    early_suspend;
+#ifdef CONFIG_FB
+	struct notifier_block fb_notif;
+	bool fb_suspended;
 #endif
 #ifdef CONFIG_FB_MDNIE_RGB_ADJUST
 	u8 r_adj;
