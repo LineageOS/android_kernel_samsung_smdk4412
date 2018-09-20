@@ -18,7 +18,8 @@
 #include <linux/fb.h>
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
-#include <linux/earlysuspend.h>
+#include <linux/fb.h>
+#include <linux/notifier.h>
 #endif
 #include <plat/fb-s5p.h>
 #endif
@@ -233,7 +234,8 @@ struct s3cfb_global {
 	struct sw_sync_timeline *timeline;
 	int			timeline_max;
 #ifdef CONFIG_HAS_WAKELOCK
-	struct early_suspend	early_suspend;
+	struct notifier_block	fb_notif;
+	bool			fb_suspended;
 	struct wake_lock	idle_lock;
 #endif
 #ifdef FEATURE_BUSFREQ_LOCK
@@ -463,9 +465,11 @@ extern int s3cfb_vsync_status_check(void);
 #endif
 
 #ifdef CONFIG_HAS_WAKELOCK
-#ifdef CONFIG_HAS_EARLYSUSPEND
-extern void s3cfb_early_suspend(struct early_suspend *h);
-extern void s3cfb_late_resume(struct early_suspend *h);
+#ifdef CONFIG_FB
+extern void s3cfb_fb_suspend(struct s3cfb_global *info);
+extern void s3cfb_fb_resume(struct s3cfb_global *info);
+extern int s3cfb_fb_notifier_callback(struct notifier_block *self,
+				unsigned long event, void *data);
 #endif
 #endif
 
