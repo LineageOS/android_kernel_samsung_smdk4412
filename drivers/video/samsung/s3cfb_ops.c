@@ -890,6 +890,9 @@ int s3cfb_setcolreg(unsigned int regno, unsigned int red,
 
 int s3cfb_blank(int blank_mode, struct fb_info *fb)
 {
+#if defined(CONFIG_CPU_EXYNOS4210)
+	return 0;
+#endif
 	struct s3cfb_window *win = fb->par;
 	struct s3cfb_window *tmp_win;
 	struct s3cfb_global *fbdev = get_fimd_global(win->id);
