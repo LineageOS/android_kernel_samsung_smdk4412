@@ -421,7 +421,7 @@ struct exynos_ss_udc {
 
 	struct usb_gadget	gadget;
 	struct exynos_ss_udc_ep	eps[EXYNOS_USB3_EPS];
-	struct wake_lock	usbd_wake_lock;
+	struct wakeup_source	usbd_wake_lock;
 };
 
 #if defined(CONFIG_BATTERY_SAMSUNG)
