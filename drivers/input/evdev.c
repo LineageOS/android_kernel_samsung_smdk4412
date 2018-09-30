@@ -49,7 +49,7 @@ struct evdev_client {
 	unsigned int tail;
 	unsigned int packet_head; /* [future] position of the first element of next packet */
 	spinlock_t buffer_lock; /* protects access to buffer, head and tail */
-	struct wake_lock wake_lock;
+	struct wakeup_source wake_lock;
 	bool use_wake_lock;
 	char name[28];
 	struct fasync_struct *fasync;
@@ -90,13 +90,13 @@ static void evdev_pass_event(struct evdev_client *client,
 
 		client->packet_head = client->tail;
 		if (client->use_wake_lock)
-			wake_unlock(&client->wake_lock);
+			__pm_relax(&client->wake_lock);
 	}
 
 	if (event->type == EV_SYN && event->code == SYN_REPORT) {
 		client->packet_head = client->head;
 		if (client->use_wake_lock)
-			wake_lock(&client->wake_lock);
+			__pm_stay_awake(&client->wake_lock);
 		kill_fasync(&client->fasync, SIGIO, POLL_IN);
 	}
 
@@ -278,7 +278,7 @@ static int evdev_release(struct inode *inode, struct file *file)
 
 	evdev_detach_client(evdev, client);
 	if (client->use_wake_lock)
-		wake_lock_destroy(&client->wake_lock);
+		wakeup_source_trash(&client->wake_lock);
 	kfree(client);
 
 	evdev_close_device(evdev);
@@ -401,7 +401,7 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 		client->tail &= client->bufsize - 1;
 		if (client->use_wake_lock &&
 		    client->packet_head == client->tail)
-			wake_unlock(&client->wake_lock);
+			__pm_relax(&client->wake_lock);
 	}
 
 	spin_unlock_irq(&client->buffer_lock);
@@ -657,10 +657,10 @@ static int evdev_enable_suspend_block(struct evdev *evdev,
 		return 0;
 
 	spin_lock_irq(&client->buffer_lock);
-	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, client->name);
+	wakeup_source_init(&client->wake_lock, client->name);
 	client->use_wake_lock = true;
 	if (client->packet_head != client->tail)
-		wake_lock(&client->wake_lock);
+		__pm_stay_awake(&client->wake_lock);
 	spin_unlock_irq(&client->buffer_lock);
 	return 0;
 }
@@ -673,7 +673,7 @@ static int evdev_disable_suspend_block(struct evdev *evdev,
 
 	spin_lock_irq(&client->buffer_lock);
 	client->use_wake_lock = false;
-	wake_lock_destroy(&client->wake_lock);
+	wakeup_source_trash(&client->wake_lock);
 	spin_unlock_irq(&client->buffer_lock);
 
 	return 0;
