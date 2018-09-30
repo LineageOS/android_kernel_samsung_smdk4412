@@ -52,7 +52,7 @@
 #else
 #define SEND_KEY_CHECK_TIME_MS	40		/* 40ms */
 #endif
-#define WAKE_LOCK_TIME		(HZ * 5)	/* 5 sec */
+#define WAKE_LOCK_TIME		5000	/* 5 sec */
 #define EAR_CHECK_LOOP_CNT	10
 
 #if defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_P4NOTE) \
@@ -77,7 +77,7 @@ struct sec_jack_info {
 	struct work_struct buttons_work;
 	struct workqueue_struct *queue;
 	struct input_dev *input_dev;
-	struct wake_lock det_wake_lock;
+	struct wakeup_source det_wake_lock;
 	struct sec_jack_zone *zone;
 	struct input_handler handler;
 	struct input_handle handle;
@@ -382,7 +382,7 @@ static irqreturn_t sec_jack_detect_irq_thread(int irq, void *dev_id)
 	hi->det_status = true;
 
 	/* prevent suspend to allow user space to respond to switch */
-	wake_lock_timeout(&hi->det_wake_lock, WAKE_LOCK_TIME);
+	__pm_wakeup_event(&hi->det_wake_lock, WAKE_LOCK_TIME);
 
 	/* debounce headset jack.  don't try to determine the type of
 	 * headset until the detect state is true for a while.
@@ -428,7 +428,7 @@ void sec_jack_buttons_work(struct work_struct *work)
 	int i;
 
 	/* prevent suspend to allow user space to respond to switch */
-	wake_lock_timeout(&hi->det_wake_lock, WAKE_LOCK_TIME);
+	__pm_wakeup_event(&hi->det_wake_lock, WAKE_LOCK_TIME);
 
 	/* when button is released */
 	if (hi->pressed == 0) {
@@ -636,7 +636,7 @@ static int sec_jack_probe(struct platform_device *pdev)
 		printk(KERN_ERR "SEC JACK: Failed to register switch device\n");
 		goto err_switch_dev_register_send_end;
 	}
-	wake_lock_init(&hi->det_wake_lock, WAKE_LOCK_SUSPEND, "sec_jack_det");
+	wakeup_source_init(&hi->det_wake_lock, "sec_jack_det");
 
 	INIT_WORK(&hi->buttons_work, sec_jack_buttons_work);
 	hi->queue = create_singlethread_workqueue("sec_jack_wq");
@@ -739,7 +739,7 @@ err_register_input_handler:
 err_register_adc:
 	destroy_workqueue(hi->queue);
 err_create_wq_failed:
-	wake_lock_destroy(&hi->det_wake_lock);
+	wakeup_source_trash(&hi->det_wake_lock);
 	switch_dev_unregister(&switch_sendend);
 err_switch_dev_register_send_end:
 	switch_dev_unregister(&switch_jack_detection);
@@ -767,7 +767,7 @@ static int sec_jack_remove(struct platform_device *pdev)
 		hi->send_key_dev = NULL;
 	}
 	input_unregister_handler(&hi->handler);
-	wake_lock_destroy(&hi->det_wake_lock);
+	wakeup_source_trash(&hi->det_wake_lock);
 	switch_dev_unregister(&switch_sendend);
 	switch_dev_unregister(&switch_jack_detection);
 	gpio_free(hi->pdata->det_gpio);
