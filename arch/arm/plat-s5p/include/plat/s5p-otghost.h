@@ -57,7 +57,7 @@ struct sec_otghost {
 
 	bool ch_halt;
 	union port_flags_t port_flag;
-	struct wake_lock wake_lock;
+	struct wakeup_source wake_lock;
 
 	struct work_struct work;
 	struct workqueue_struct *wq;

@@ -147,8 +147,8 @@ static int s5pc110_start_otg(u32 regs)
 	otghost->otg_data = otg_data;
 
 	/* 2. wake lock */
-	wake_lock_init(&otghost->wake_lock, WAKE_LOCK_SUSPEND, "usb_otg");
-	wake_lock(&otghost->wake_lock);
+	wakeup_source_init(&otghost->wake_lock, "usb_otg");
+	__pm_stay_awake(&otghost->wake_lock);
 
 	/* base address */
 	if (!regs) {
@@ -262,8 +262,8 @@ static int s5pc110_stop_otg(void)
 	destroy_workqueue(otghost->wq);
 
 	/* 2. wake lock */
-	wake_unlock(&otghost->wake_lock);
-	wake_lock_destroy(&otghost->wake_lock);
+	__pm_relax(&otghost->wake_lock);
+	wakeup_source_trash(&otghost->wake_lock);
 
 	/* 1. hcd */
 	usb_put_hcd(g_pUsbHcd);
