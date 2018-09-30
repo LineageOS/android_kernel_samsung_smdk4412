@@ -45,7 +45,7 @@ struct gpio_input_state {
 	int use_irq;
 	int debounce_count;
 	spinlock_t irq_lock;
-	struct wake_lock wake_lock;
+	struct wakeup_source wake_lock;
 	struct gpio_key_state key_state[0];
 };
 
@@ -153,7 +153,7 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 	else if (!ds->use_irq)
 		hrtimer_start(timer, ds->info->poll_time, HRTIMER_MODE_REL);
 	else
-		wake_unlock(&ds->wake_lock);
+		__pm_relax(&ds->wake_lock);
 
 	spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 
@@ -179,7 +179,7 @@ static irqreturn_t gpio_event_input_irq_handler(int irq, void *dev_id)
 		if (ks->debounce & DEBOUNCE_WAIT_IRQ) {
 			ks->debounce = DEBOUNCE_UNKNOWN;
 			if (ds->debounce_count++ == 0) {
-				wake_lock(&ds->wake_lock);
+				__pm_stay_awake(&ds->wake_lock);
 				hrtimer_start(
 					&ds->timer, ds->info->debounce_time,
 					HRTIMER_MODE_REL);
@@ -297,7 +297,7 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		ds->debounce_count = di->keymap_size;
 		ds->input_devs = input_devs;
 		ds->info = di;
-		wake_lock_init(&ds->wake_lock, WAKE_LOCK_SUSPEND, "gpio_input");
+		wakeup_source_init(&ds->wake_lock, "gpio_input");
 		spin_lock_init(&ds->irq_lock);
 
 		for (i = 0; i < di->keymap_size; i++) {
@@ -369,7 +369,7 @@ err_gpio_request_failed:
 		;
 	}
 err_bad_keymap:
-	wake_lock_destroy(&ds->wake_lock);
+	wakeup_source_trash(&ds->wake_lock);
 	kfree(ds);
 err_ds_alloc_failed:
 	return ret;
