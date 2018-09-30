@@ -157,7 +157,7 @@ static bool bln_blink_freezed = false;
 static bool bln_blink_enabled = false;
 static bool bln_suspended = false;
 static bool bln_use_wakelock = false;
-static struct wake_lock bln_wake_lock;
+static struct wakeup_source bln_wake_lock;
 
 static DEFINE_MUTEX(led_notification_mutex);
 static void enable_led_notification(void);
@@ -2081,9 +2081,9 @@ static void enable_led_notification(void) {
 			bln_breathing = true;
 		}
 		if (bln_breathing){
-			if (!wake_lock_active(&bln_wake_lock) && bln_use_wakelock) {
+			if (bln_use_wakelock) {
 			    printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Lock wakelock\n", __func__);
-			    wake_lock(&bln_wake_lock);
+			    __pm_stay_awake(&bln_wake_lock);
 			}
 			mod_timer(&bln_breathing_timer, jiffies + 4);
 		}
@@ -2258,10 +2258,8 @@ static void bln_breathe_process(struct work_struct *work)
 		change_touch_key_led_voltage(touchkey_voltage_brightness);
 		touchkey_led_status = TK_CMD_LED_ON;
 		i2c_touchkey_write(bl_tkey_i2c->client, (u8 *)&touchkey_led_status, 1);
-		if (wake_lock_active(&bln_wake_lock)){
-		    printk(KERN_DEBUG "[TouchKey-BLN] %s: Unlock wakelock\n", __func__);
-		    wake_unlock(&bln_wake_lock);
-		}
+		printk(KERN_DEBUG "[TouchKey-BLN] %s: Unlock wakelock\n", __func__);
+		__pm_relax(&bln_wake_lock);
 
 		return;
 	}
@@ -2298,10 +2296,8 @@ void bln_stop_breathing(void)
 	del_timer(&bln_breathing_timer);
 	change_touch_key_led_voltage(touchkey_voltage);
 
-	if (wake_lock_active(&bln_wake_lock)){
-            printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Unlock wakelock\n", __func__);
-            wake_unlock(&bln_wake_lock);
-        }
+	printk(KERN_DEBUG "[TouchKey-BLN] %s: Breathing - Unlock wakelock\n", __func__);
+	__pm_relax(&bln_wake_lock);
 }
 
 static void bln_handle_breathe(unsigned long data)
@@ -2785,7 +2781,7 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 	setup_timer(&bln_notification_timeout_timer, bln_handle_notification_timeout_timer, 0);
 
 	/* wake lock for breathing-mode BLN */
-	wake_lock_init(&bln_wake_lock, WAKE_LOCK_SUSPEND, "bln_wake_lock");
+	wakeup_source_init(&bln_wake_lock, "bln_wake_lock");
 	err = misc_register(&led_device);
 	if (err) {
 		printk(KERN_ERR "[LED] sysfs misc_register failed.\n");
