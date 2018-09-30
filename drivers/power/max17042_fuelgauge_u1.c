@@ -506,7 +506,7 @@ static void max17042_work(struct work_struct *work)
 	if (chip->raw_soc < chip->fuel_alert_soc) {
 		if (!(chip->is_fuel_alerted) &&
 			chip->pdata->low_batt_cb) {
-			wake_lock(&chip->fuel_alert_wake_lock);
+			__pm_stay_awake(&chip->fuel_alert_wake_lock);
 			chip->pdata->low_batt_cb();
 			chip->is_fuel_alerted = true;
 
@@ -718,7 +718,7 @@ static irqreturn_t max17042_irq_thread(int irq, void *irq_data)
 		data[1] |= (0x1 << 3);
 
 		if (chip->pdata->low_batt_cb && !(chip->is_fuel_alerted)) {
-			wake_lock(&chip->fuel_alert_wake_lock);
+			__pm_stay_awake(&chip->fuel_alert_wake_lock);
 			chip->pdata->low_batt_cb();
 			chip->is_fuel_alerted = true;
 		} else
