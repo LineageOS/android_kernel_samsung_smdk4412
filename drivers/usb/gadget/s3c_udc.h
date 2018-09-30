@@ -140,8 +140,8 @@ struct s3c_udc {
 	struct resource *regs_res;
 	unsigned int irq;
 	unsigned req_pending:1, req_std:1, req_config:1;
-	struct wake_lock	usbd_wake_lock;
-	struct wake_lock	usb_cb_wake_lock;
+	struct wakeup_source	usbd_wake_lock;
+	struct wakeup_source	usb_cb_wake_lock;
 	int softconnect;
 	int udc_enabled;
 	int is_usb_ready;

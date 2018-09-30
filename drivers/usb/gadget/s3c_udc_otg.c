@@ -348,13 +348,13 @@ int s3c_vbus_enable(struct usb_gadget *gadget, int is_active)
 #if defined(CONFIG_BATTERY_SAMSUNG)
 			s3c_udc_cable_disconnect(dev);
 #endif
-			wake_lock_timeout(&dev->usbd_wake_lock, HZ * 5);
-			wake_lock_timeout(&dev->usb_cb_wake_lock, HZ * 5);
+			__pm_wakeup_event(&dev->usbd_wake_lock, 5000);
+			__pm_wakeup_event(&dev->usb_cb_wake_lock, 5000);
 		} else {
 			printk(KERN_DEBUG "usb: %s is_active=%d(udc_enable),"
 							"softconnect=%d\n",
 					__func__, is_active, dev->softconnect);
-			wake_lock(&dev->usb_cb_wake_lock);
+			__pm_stay_awake(&dev->usb_cb_wake_lock);
 			udc_reinit(dev);
 			udc_enable(dev);
 			if (!dev->softconnect)
@@ -1281,10 +1281,8 @@ static int s3c_udc_probe(struct platform_device *pdev)
 	}
 
 	udc_reinit(dev);
-	wake_lock_init(&dev->usbd_wake_lock, WAKE_LOCK_SUSPEND,
-			"usb device wake lock");
-	wake_lock_init(&dev->usb_cb_wake_lock, WAKE_LOCK_SUSPEND,
-			"usb cb wake lock");
+	wakeup_source_init(&dev->usbd_wake_lock, "usb device wake lock");
+	wakeup_source_init(&dev->usb_cb_wake_lock, "usb cb wake lock");
 
 	/* irq setup after old hardware state is cleaned up */
 	irq = platform_get_irq(pdev, 0);
@@ -1359,8 +1357,8 @@ static int s3c_udc_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, 0);
 
 	the_controller = 0;
-	wake_lock_destroy(&dev->usbd_wake_lock);
-	wake_lock_destroy(&dev->usb_cb_wake_lock);
+	wakeup_source_trash(&dev->usbd_wake_lock);
+	wakeup_source_trash(&dev->usb_cb_wake_lock);
 	cancel_delayed_work(&dev->usb_ready_work);
 	mutex_destroy(&dev->mutex);
 
