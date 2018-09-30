@@ -48,7 +48,7 @@ struct max17042_chip {
 	int temperature;
 	int fuel_alert_soc;		/* fuel alert threshold */
 	bool is_fuel_alerted;	/* fuel alerted */
-	struct wake_lock fuel_alert_wake_lock;
+	struct wakeup_source fuel_alert_wake_lock;
 	bool is_enable;			/* can be fuel guage enable */
 
 #ifdef RECAL_SOC_FOR_MAXIM
@@ -519,7 +519,7 @@ static void max17042_work(struct work_struct *work)
 				chip->raw_soc);
 	} else if (chip->raw_soc >= chip->fuel_alert_soc) {
 		if (chip->is_fuel_alerted) {
-			wake_unlock(&chip->fuel_alert_wake_lock);
+			__pm_relax(&chip->fuel_alert_wake_lock);
 			chip->is_fuel_alerted = false;
 
 			dev_info(&chip->client->dev,
@@ -732,7 +732,7 @@ static irqreturn_t max17042_irq_thread(int irq, void *irq_data)
 			__func__, data[1], data[0]);
 	} else if (!max17042_alert_status /* && (chip->is_fuel_alerted)*/) {
 		if (chip->is_fuel_alerted)
-			wake_unlock(&chip->fuel_alert_wake_lock);
+			__pm_relax(&chip->fuel_alert_wake_lock);
 		chip->is_fuel_alerted = false;
 
 		if (max17042_read_reg(chip->client, MAX17042_REG_CONFIG, data)
@@ -918,8 +918,7 @@ static int __devinit max17042_probe(struct i2c_client *client,
 		/* register low batt intr */
 		chip->pdata->alert_irq = gpio_to_irq(chip->pdata->alert_gpio);
 
-		wake_lock_init(&chip->fuel_alert_wake_lock, WAKE_LOCK_SUSPEND,
-			       "fuel_alerted");
+		wakeup_source_init(&chip->fuel_alert_wake_lock, "fuel_alerted");
 
 		data = chip->pdata->alert_init;
 		for (i = 0; i < chip->pdata->alert_init_size; i += 3)
@@ -949,7 +948,7 @@ static int __devinit max17042_probe(struct i2c_client *client,
 	return 0;
 
 err_kfree:
-	wake_lock_destroy(&chip->fuel_alert_wake_lock);
+	wakeup_source_trash(&chip->fuel_alert_wake_lock);
 	kfree(chip);
 	return ret;
 }
@@ -960,7 +959,7 @@ static int __devexit max17042_remove(struct i2c_client *client)
 
 	power_supply_unregister(&chip->battery);
 	cancel_delayed_work(&chip->work);
-	wake_lock_destroy(&chip->fuel_alert_wake_lock);
+	wakeup_source_trash(&chip->fuel_alert_wake_lock);
 	kfree(chip);
 	return 0;
 }
