@@ -288,9 +288,9 @@ struct sec_bat_info {
 	struct power_supply psy_usb;
 	struct power_supply psy_ac;
 
-	struct wake_lock vbus_wake_lock;
-	struct wake_lock monitor_wake_lock;
-	struct wake_lock cable_wake_lock;
+	struct wakeup_source vbus_wake_lock;
+	struct wakeup_source monitor_wake_lock;
+	struct wakeup_source cable_wake_lock;
 
 	enum cable_type_t cable_type;
 	enum batt_full_t batt_full_status;
@@ -641,7 +641,7 @@ static int sec_bat_set_property(struct power_supply *ps,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		dev_info(info->dev, "%s: refresh battery data\n", __func__);
-		wake_lock(&info->monitor_wake_lock);
+		__pm_stay_awake(&info->monitor_wake_lock);
 		queue_work(info->monitor_wqueue, &info->monitor_work);
 
 		break;
@@ -650,7 +650,7 @@ static int sec_bat_set_property(struct power_supply *ps,
 		dev_info(info->dev, "%s: lowbatt intr\n", __func__);
 		if (val->intval != POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL)
 			return -EINVAL;
-		wake_lock(&info->monitor_wake_lock);
+		__pm_stay_awake(&info->monitor_wake_lock);
 		queue_work(info->monitor_wqueue, &info->monitor_work);
 
 		break;
@@ -674,7 +674,7 @@ static int sec_bat_set_property(struct power_supply *ps,
 		default:
 			return -EINVAL;
 		}
-		wake_lock(&info->cable_wake_lock);
+		__pm_stay_awake(&info->cable_wake_lock);
 		queue_work(info->monitor_wqueue, &info->cable_work);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
@@ -683,7 +683,7 @@ static int sec_bat_set_property(struct power_supply *ps,
 		 */
 		info->batt_tmu_status = val->intval;
 
-		wake_lock(&info->monitor_wake_lock);
+		__pm_stay_awake(&info->monitor_wake_lock);
 		queue_work(info->monitor_wqueue, &info->monitor_work);
 
 		dev_info(info->dev, "%s: TMU status has been changed(%d)\n",
@@ -1675,7 +1675,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 			info->batt_temp_ext = BATT_TEMP_EXT_NONE;
 			info->batt_temp_ext_pre = BATT_TEMP_EXT_NONE;
 #endif
-			wake_lock_timeout(&info->vbus_wake_lock, HZ * 5);
+			__pm_wakeup_event(&info->vbus_wake_lock, 5000);
 		}
 		break;
 	case CABLE_TYPE_USB:
@@ -1683,7 +1683,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 	case CABLE_TYPE_MISC:
 		if (!sec_bat_enable_charging(info, true)) {
 			info->charging_status = POWER_SUPPLY_STATUS_CHARGING;
-			wake_lock(&info->vbus_wake_lock);
+			__pm_stay_awake(&info->vbus_wake_lock);
 		}
 		break;
 	default:
@@ -1694,7 +1694,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 	power_supply_changed(&info->psy_ac);
 	power_supply_changed(&info->psy_usb);
 
-	wake_unlock(&info->cable_wake_lock);
+	__pm_relax(&info->cable_wake_lock);
 }
 
 static bool sec_bat_charging_time_management(struct sec_bat_info *info)
@@ -2288,7 +2288,7 @@ static void sec_bat_monitor_work(struct work_struct *work)
 
 	power_supply_changed(&info->psy_bat);
 
-	wake_unlock(&info->monitor_wake_lock);
+	__pm_relax(&info->monitor_wake_lock);
 
 	return;
 }
@@ -2317,7 +2317,7 @@ static void sec_bat_vf_check_work(struct work_struct *work)
 	if (info->batt_health == POWER_SUPPLY_HEALTH_UNSPEC_FAILURE) {
 		dev_info(info->dev, "%s: Battery Disconnected\n", __func__);
 #endif
-		wake_lock(&info->monitor_wake_lock);
+		__pm_stay_awake(&info->monitor_wake_lock);
 		queue_work(info->monitor_wqueue, &info->monitor_work);
 	}
 
@@ -2331,7 +2331,7 @@ static void sec_bat_polling_work(struct work_struct *work)
 	struct sec_bat_info *info;
 	info = container_of(work, struct sec_bat_info, polling_work.work);
 
-	wake_lock(&info->monitor_wake_lock);
+	__pm_stay_awake(&info->monitor_wake_lock);
 	queue_work(info->monitor_wqueue, &info->monitor_work);
 
 	if (info->initial_check_count) {
@@ -3167,12 +3167,9 @@ static __devinit int sec_bat_probe(struct platform_device *pdev)
 	    info->psy_ac.num_properties = ARRAY_SIZE(sec_power_props),
 	    info->psy_ac.get_property = sec_ac_get_property;
 
-	wake_lock_init(&info->vbus_wake_lock, WAKE_LOCK_SUSPEND,
-		       "vbus_present");
-	wake_lock_init(&info->monitor_wake_lock, WAKE_LOCK_SUSPEND,
-		       "sec-battery-monitor");
-	wake_lock_init(&info->cable_wake_lock, WAKE_LOCK_SUSPEND,
-		       "sec-battery-cable");
+	wakeup_source_init(&info->vbus_wake_lock, "vbus_present");
+	wakeup_source_init(&info->monitor_wake_lock, "sec-battery-monitor");
+	wakeup_source_init(&info->cable_wake_lock, "sec-battery-cable");
 
 	psy = get_power_supply_by_name(info->charger_name);
 
@@ -3317,9 +3314,9 @@ static __devinit int sec_bat_probe(struct platform_device *pdev)
  err_supply_unreg_bat:
 	power_supply_unregister(&info->psy_bat);
  err_wake_lock:
-	wake_lock_destroy(&info->vbus_wake_lock);
-	wake_lock_destroy(&info->monitor_wake_lock);
-	wake_lock_destroy(&info->cable_wake_lock);
+	wakeup_source_trash(&info->vbus_wake_lock);
+	wakeup_source_trash(&info->monitor_wake_lock);
+	wakeup_source_trash(&info->cable_wake_lock);
 	s3c_adc_release(info->padc);
 	mutex_destroy(&info->adclock);
  err_kfree:
@@ -3346,9 +3343,9 @@ static int __devexit sec_bat_remove(struct platform_device *pdev)
 	power_supply_unregister(&info->psy_usb);
 	power_supply_unregister(&info->psy_ac);
 
-	wake_lock_destroy(&info->vbus_wake_lock);
-	wake_lock_destroy(&info->monitor_wake_lock);
-	wake_lock_destroy(&info->cable_wake_lock);
+	wakeup_source_trash(&info->vbus_wake_lock);
+	wakeup_source_trash(&info->monitor_wake_lock);
+	wakeup_source_trash(&info->cable_wake_lock);
 	mutex_destroy(&info->adclock);
 
 	s3c_adc_release(info->padc);
@@ -3375,7 +3372,7 @@ static int sec_bat_resume(struct device *dev)
 {
 	struct sec_bat_info *info = dev_get_drvdata(dev);
 
-	wake_lock(&info->monitor_wake_lock);
+	__pm_stay_awake(&info->monitor_wake_lock);
 	queue_work(info->monitor_wqueue, &info->monitor_work);
 
 	schedule_delayed_work(&info->polling_work,
