@@ -77,7 +77,7 @@ static char g_szDeviceName[(VIBE_MAX_DEVICE_NAME_LENGTH
 /* initialized in init_module */
 static size_t g_cchDeviceName;
 
-static struct wake_lock vib_wake_lock;
+static struct wakeup_source vib_wake_lock;
 
 /* Flag indicating whether the driver is in use */
 static char g_bIsPlaying;
@@ -277,7 +277,7 @@ int init_module(void)
 		g_SamplesBuffer[i].actuatorSamples[1].nBufferSize = 0;
 	}
 
-	wake_lock_init(&vib_wake_lock, WAKE_LOCK_SUSPEND, "vib_present");
+	wakeup_source_init(&vib_wake_lock, "vib_present");
 	return 0;
 
 err_platform_drv_reg:
@@ -308,7 +308,7 @@ void cleanup_module(void)
 #else
 	misc_deregister(&miscdev);
 #endif
-	wake_lock_destroy(&vib_wake_lock);
+	wakeup_source_trash(&vib_wake_lock);
 }
 
 static int open(struct inode *inode, struct file *file)
@@ -533,7 +533,7 @@ static long unlocked_ioctl(struct file *file, unsigned int cmd,
 		break;
 
 	case TSPDRV_ENABLE_AMP:
-		wake_lock(&vib_wake_lock);
+		__pm_stay_awake(&vib_wake_lock);
                 #if defined(CONFIG_MACH_GRANDE)
 	        regulator_enable(regulator);
 		printk(KERN_INFO "[TSPDRV] vmotor power on\n");
@@ -559,7 +559,7 @@ static long unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (!g_bStopRequested)
 			ImmVibeSPI_ForceOut_AmpDisable(arg);
                 #endif
-		wake_unlock(&vib_wake_lock);
+		__pm_relax(&vib_wake_lock);
 		break;
 
 	case TSPDRV_GET_NUM_ACTUATORS:
