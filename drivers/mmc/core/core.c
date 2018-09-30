@@ -1538,7 +1538,7 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 #endif
 
 	host->detect_change = 1;
-	wake_lock(&host->detect_wake_lock);
+	__pm_stay_awake(&host->detect_wake_lock);
 	mmc_schedule_delayed_work(&host->detect, delay);
 }
 
@@ -2234,11 +2234,11 @@ void mmc_rescan(struct work_struct *work)
 
  out:
 	if (extend_wakelock)
-		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
+		__pm_wakeup_event(&host->detect_wake_lock, 500);
 	else
-		wake_unlock(&host->detect_wake_lock);
+		__pm_relax(&host->detect_wake_lock);
 	if (host->caps & MMC_CAP_NEEDS_POLL) {
-		wake_lock(&host->detect_wake_lock);
+		__pm_stay_awake(&host->detect_wake_lock);
 		mmc_schedule_delayed_work(&host->detect, HZ);
 	}
 }
@@ -2261,7 +2261,7 @@ void mmc_stop_host(struct mmc_host *host)
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
 	if (cancel_delayed_work_sync(&host->detect))
-		wake_unlock(&host->detect_wake_lock);
+		__pm_relax(&host->detect_wake_lock);
 	mmc_flush_scheduled_work();
 
 	/* clear pm flags now and let card drivers set them as needed */
@@ -2447,7 +2447,7 @@ int mmc_suspend_host(struct mmc_host *host)
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
 	if (cancel_delayed_work(&host->detect))
-		wake_unlock(&host->detect_wake_lock);
+		__pm_relax(&host->detect_wake_lock);
 	mmc_flush_scheduled_work();
 	if (mmc_try_claim_host(host)) {
 #ifndef CONFIG_WIMAX_CMC
@@ -2614,7 +2614,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		host->power_notify_type = MMC_HOST_PW_NOTIFY_SHORT;
 		spin_unlock_irqrestore(&host->lock, flags);
 		if (cancel_delayed_work_sync(&host->detect))
-			wake_unlock(&host->detect_wake_lock);
+			__pm_relax(&host->detect_wake_lock);
 
 		if (!host->bus_ops || host->bus_ops->suspend)
 			break;
