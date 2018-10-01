@@ -382,7 +382,7 @@ static int usb_send(struct link_device *ld, struct io_device *iod,
 	/* en queue skb data */
 	skb_queue_tail(txq, skb);
 	/* Hold wake_lock for getting schedule the tx_work */
-	wake_lock(&pm_data->tx_async_wake);
+	__pm_stay_awake(&pm_data->tx_async_wake);
 
 	if (!work_pending(&ld->tx_delayed_work.work))
 		queue_delayed_work(ld->tx_wq, &ld->tx_delayed_work, 0);
@@ -562,7 +562,7 @@ static void usb_tx_work(struct work_struct *work)
 
 		pm_runtime_put(&usb_ld->usbdev->dev);
 	}
-	wake_unlock(&pm_data->tx_async_wake);
+	__pm_relax(&pm_data->tx_async_wake);
 exit:
 	return;
 
@@ -589,7 +589,7 @@ static int link_pm_runtime_get_active(struct link_pm_data *pm_data)
 		mif_err("Kernel in suspending try get_active later\n");
 		/* during dpm_suspending..
 		 * if AP get tx data, wake up. */
-		wake_lock(&pm_data->l2_wake);
+		__pm_stay_awake(&pm_data->l2_wake);
 		return -EAGAIN;
 	}
 
@@ -783,16 +783,16 @@ static void link_pm_runtime_work(struct work_struct *work)
 		if (pm_data->resume_requested)
 			break;
 		pm_data->resume_requested = true;
-		wake_lock(&pm_data->rpm_wake);
+		__pm_stay_awake(&pm_data->rpm_wake);
 		ret = link_pm_slave_wake(pm_data);
 		if (ret < 0) {
 			mif_err("slave wake fail\n");
-			wake_unlock(&pm_data->rpm_wake);
+			__pm_relax(&pm_data->rpm_wake);
 			break;
 		}
 
 		if (!pm_data->usb_ld->if_usb_connected) {
-			wake_unlock(&pm_data->rpm_wake);
+			__pm_relax(&pm_data->rpm_wake);
 			return;
 		}
 
@@ -800,7 +800,7 @@ static void link_pm_runtime_work(struct work_struct *work)
 		if (ret < 0) {
 			mif_err("resume error(%d)\n", ret);
 			if (!pm_data->usb_ld->if_usb_connected) {
-				wake_unlock(&pm_data->rpm_wake);
+				__pm_relax(&pm_data->rpm_wake);
 				return;
 			}
 			/* force to go runtime idle before retry resume */
@@ -810,7 +810,7 @@ static void link_pm_runtime_work(struct work_struct *work)
 				pm_runtime_idle(dev);
 			}
 		}
-		wake_unlock(&pm_data->rpm_wake);
+		__pm_relax(&pm_data->rpm_wake);
 		break;
 	case RPM_SUSPENDING:
 		/* Checking the usb_runtime_suspend running time.*/
@@ -868,7 +868,7 @@ static irqreturn_t link_pm_irq_handler(int irq, void *data)
 	if (pm_data->dpm_suspending) {
 		mif_info("ignore request by suspending\n");
 		/* Ignore HWK but AP got to L2 by suspending fail */
-		wake_lock(&pm_data->l2_wake);
+		__pm_stay_awake(&pm_data->l2_wake);
 		return IRQ_HANDLED;
 	}
 
@@ -1047,7 +1047,7 @@ static int if_usb_suspend(struct usb_interface *intf, pm_message_t message)
 
 	if (devdata->usb_ld->suspended == LINKPM_DEV_NUM) {
 		mif_debug("[if_usb_suspended]\n");
-		wake_lock_timeout(&pm_data->l2_wake, msecs_to_jiffies(50));
+		__pm_wakeup_event(&pm_data->l2_wake, msecs_to_jiffies(50) / HZ * 1000);
 #ifdef	CONFIG_SLP
 		pm_wakeup_event(pm_data->miscdev.this_device,
 				msecs_to_jiffies(20));
@@ -1094,7 +1094,7 @@ static int if_usb_resume(struct usb_interface *intf)
 	devdata->usb_ld->suspended--;
 	if (!devdata->usb_ld->suspended) {
 		mif_debug("[if_usb_resumed]\n");
-		wake_lock(&pm_data->l2_wake);
+		__pm_stay_awake(&pm_data->l2_wake);
 	}
 
 	return 0;
@@ -1148,7 +1148,7 @@ static void if_usb_disconnect(struct usb_interface *intf)
 	pm_data->ipc_debug_cnt = 0;
 
 	devdata->usb_ld->suspended = 0;
-	wake_lock(&pm_data->boot_wake);
+	__pm_stay_awake(&pm_data->boot_wake);
 
 	usb_set_intfdata(intf, NULL);
 
@@ -1345,8 +1345,8 @@ static int __devinit if_usb_probe(struct usb_interface *intf,
 			queue_delayed_work(usb_ld->link_pm_data->wq,
 					&usb_ld->link_pm_data->link_pm_start,
 					msecs_to_jiffies(500));
-			wake_lock(&usb_ld->link_pm_data->l2_wake);
-			wake_unlock(&usb_ld->link_pm_data->boot_wake);
+			__pm_stay_awake(&usb_ld->link_pm_data->l2_wake);
+			__pm_relax(&usb_ld->link_pm_data->boot_wake);
 	}
 
 	/* HSIC main comm channel has been established */
@@ -1526,10 +1526,10 @@ static int usb_link_pm_init(struct usb_link_device *usb_ld, void *data)
 	INIT_DELAYED_WORK(&pm_data->link_pm_start, link_pm_runtime_start);
 	INIT_DELAYED_WORK(&pm_data->link_reconnect_work,
 						link_pm_reconnect_work);
-	wake_lock_init(&pm_data->l2_wake, WAKE_LOCK_SUSPEND, "l2_hsic");
-	wake_lock_init(&pm_data->boot_wake, WAKE_LOCK_SUSPEND, "boot_hsic");
-	wake_lock_init(&pm_data->rpm_wake, WAKE_LOCK_SUSPEND, "rpm_hsic");
-	wake_lock_init(&pm_data->tx_async_wake, WAKE_LOCK_SUSPEND, "tx_hsic");
+	wakeup_source_init(&pm_data->l2_wake, "l2_hsic");
+	wakeup_source_init(&pm_data->boot_wake, "boot_hsic");
+	wakeup_source_init(&pm_data->rpm_wake, "rpm_hsic");
+	wakeup_source_init(&pm_data->tx_async_wake, "tx_hsic");
 
 #if defined(CONFIG_SLP)
 	device_init_wakeup(pm_data->miscdev.this_device, true);

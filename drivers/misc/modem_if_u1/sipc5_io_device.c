@@ -850,7 +850,7 @@ static int io_dev_recv_data_from_link_dev(struct io_device *iod,
 	case IPC_RFS:
 	case IPC_MULTI_RAW:
 		if (iod->waketime)
-			wake_lock_timeout(&iod->wakelock, iod->waketime);
+			__pm_wakeup_event(&iod->wakelock, iod->waketime / HZ * 1000);
 
 		if (ld->link_type == LINKDEV_DPRAM && ld->aligned)
 			err = rx_frame_from_mem(iod, ld, data, len);
@@ -946,7 +946,7 @@ static int io_dev_recv_skb_from_link_dev(struct io_device *iod,
 	case IPC_RFS:
 	case IPC_MULTI_RAW:
 		if (iod->waketime)
-			wake_lock_timeout(&iod->wakelock, iod->waketime);
+			__pm_wakeup_event(&iod->wakelock, iod->waketime / HZ * 1000);
 
 		err = rx_frame_from_skb(iod, ld, skb);
 		if (err < 0) {

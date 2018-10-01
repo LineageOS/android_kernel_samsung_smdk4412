@@ -902,7 +902,7 @@ static int io_dev_recv_data_from_link_dev(struct io_device *iod,
 	case IPC_RAW:
 	case IPC_MULTI_RAW:
 		if (iod->waketime)
-			wake_lock_timeout(&iod->wakelock, iod->waketime);
+			__pm_wakeup_event(&iod->wakelock, iod->waketime / HZ * 1000);
 		err = rx_hdlc_packet(iod, ld, data, len);
 		if (err < 0)
 			mif_err("fail process HDLC frame\n");
@@ -987,8 +987,8 @@ static void io_dev_sim_state_changed(struct io_device *iod, bool sim_online)
 	} else {
 		iod->mc->sim_state.online = sim_online;
 		iod->mc->sim_state.changed = true;
-		wake_lock_timeout(&iod->mc->bootd->wakelock,
-						iod->mc->bootd->waketime);
+		__pm_wakeup_event(&iod->mc->bootd->wakelock,
+						iod->mc->bootd->waketime / HZ * 1000);
 		mif_err("sim state changed. (iod: %s, state: "
 				"[online=%d, changed=%d])\n",
 				iod->name, iod->mc->sim_state.online,
