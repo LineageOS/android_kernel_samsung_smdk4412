@@ -14,8 +14,6 @@
 #include <linux/gcd.h>
 #include <linux/clk.h>
 #include <linux/spinlock.h>
-#include <linux/fb.h>
-#include <linux/notifier.h>
 
 #include <plat/clock.h>
 #include <plat/clock-clksrc.h>
@@ -56,8 +54,7 @@ struct lcdfreq_info {
 
 	struct delayed_work	work;
 
-	struct notifier_block 		fb_notif;
-	bool 				fb_suspended;
+	struct early_suspend	early_suspend;
 };
 
 int get_div(struct s3cfb_global *ctrl)
@@ -380,12 +377,10 @@ static struct attribute_group lcdfreq_attr_group = {
 	.attrs = lcdfreq_attributes,
 };
 
-static void lcdfreq_fb_suspend(struct lcdfreq_info *lcdfreq)
+static void lcdfreq_early_suspend(struct early_suspend *h)
 {
-	if (lcdfreq->fb_suspended)
-		return;
-
-	lcdfreq->fb_suspended = true;
+	struct lcdfreq_info *lcdfreq =
+		container_of(h, struct lcdfreq_info, early_suspend);
 
 	dev_info(lcdfreq->dev, "%s\n", __func__);
 
@@ -398,12 +393,10 @@ static void lcdfreq_fb_suspend(struct lcdfreq_info *lcdfreq)
 	return;
 }
 
-static void lcdfreq_fb_resume(struct lcdfreq_info *lcdfreq)
+static void lcdfreq_late_resume(struct early_suspend *h)
 {
-	if (!lcdfreq->fb_suspended)
-		return;
-
-	lcdfreq->fb_suspended = false;
+	struct lcdfreq_info *lcdfreq =
+		container_of(h, struct lcdfreq_info, early_suspend);
 
 	dev_info(lcdfreq->dev, "%s\n", __func__);
 
@@ -412,32 +405,6 @@ static void lcdfreq_fb_resume(struct lcdfreq_info *lcdfreq)
 	mutex_unlock(&lcdfreq->lock);
 
 	return;
-}
-
-int lcdfreq_fb_notifier_callback(struct notifier_block *self,
-				unsigned long event, void *data)
-{
-	struct fb_event *evdata = data;
-	int *blank;
-	struct lcdfreq_info *lcdfreq = container_of(self, struct lcdfreq_info, fb_notif);
-	if (evdata && evdata->data && lcdfreq) {
-		if (event == FB_EVENT_BLANK) {
-			blank = evdata->data;
-			switch (*blank) {
-				case FB_BLANK_UNBLANK:
-				case FB_BLANK_NORMAL:
-				case FB_BLANK_VSYNC_SUSPEND:
-				case FB_BLANK_HSYNC_SUSPEND:
-					lcdfreq_fb_resume(lcdfreq);
-					break;
-				default:
-				case FB_BLANK_POWERDOWN:
-					lcdfreq_fb_suspend(lcdfreq);
-					break;
-			}
-		}
-	}
-	return 0;
 }
 
 static int lcdfreq_pm_notifier_event(struct notifier_block *this,
@@ -564,9 +531,11 @@ int lcdfreq_init(struct fb_info *fb)
 		goto err_2;
 	}
 
-	lcdfreq->fb_suspended = false;
-	lcdfreq->fb_notif.notifier_call = lcdfreq_fb_notifier_callback;
-	fb_register_client(&lcdfreq->fb_notif);
+	lcdfreq->early_suspend.suspend = lcdfreq_early_suspend;
+	lcdfreq->early_suspend.resume = lcdfreq_late_resume;
+	lcdfreq->early_suspend.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING + 1;
+
+	register_early_suspend(&lcdfreq->early_suspend);
 
 	lcdfreq->pm_noti.notifier_call = lcdfreq_pm_notifier_event;
 	lcdfreq->reboot_noti.notifier_call = lcdfreq_reboot_notify;
