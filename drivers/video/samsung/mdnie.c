@@ -20,9 +20,8 @@
 #include <linux/backlight.h>
 #include <linux/platform_device.h>
 #include <linux/mdnie.h>
-#ifdef CONFIG_FB
-#include <linux/fb.h>
-#include <linux/notifier.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
 #endif
 #include <linux/delay.h>
 #include <linux/lcd.h>
@@ -851,15 +850,11 @@ static struct device_attribute mdnie_attributes[] = {
 };
 
 #ifdef CONFIG_PM
-#if defined(CONFIG_FB)
-void mdnie_fb_suspend(struct mdnie_info *mdnie)
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+void mdnie_early_suspend(struct early_suspend *h)
 {
-	if (mdnie->fb_suspended)
-		return;
-
-	mdnie->fb_suspended = true;
-
 #if defined(CONFIG_FB_MDNIE_PWM)
+	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
 	struct lcd_platform_data *pd = NULL;
 	pd = mdnie->lcd_pd;
 
@@ -884,14 +879,10 @@ void mdnie_fb_suspend(struct mdnie_info *mdnie)
 	return ;
 }
 
-void mdnie_fb_resume(struct mdnie_info *mdnie)
+void mdnie_late_resume(struct early_suspend *h)
 {
-	if (!mdnie->fb_suspended)
-		return;
-
-	mdnie->fb_suspended = false;
-
 	u32 i;
+	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
 #if defined(CONFIG_FB_MDNIE_PWM)
 	struct lcd_platform_data *pd = NULL;
 
@@ -923,32 +914,6 @@ void mdnie_fb_resume(struct mdnie_info *mdnie)
 	}
 
 	return ;
-}
-
-int mdnie_fb_notifier_callback(struct notifier_block *self,
-				unsigned long event, void *data)
-{
-	struct fb_event *evdata = data;
-	int *blank;
-	struct mdnie_info *mdnie = container_of(self, struct mdnie_info, fb_notif);
-	if (evdata && evdata->data && mdnie) {
-		if (event == FB_EVENT_BLANK) {
-			blank = evdata->data;
-			switch (*blank) {
-				case FB_BLANK_UNBLANK:
-				case FB_BLANK_NORMAL:
-				case FB_BLANK_VSYNC_SUSPEND:
-				case FB_BLANK_HSYNC_SUSPEND:
-					mdnie_fb_resume(mdnie);
-					break;
-				default:
-				case FB_BLANK_POWERDOWN:
-					mdnie_fb_suspend(mdnie);
-					break;
-			}
-		}
-	}
-	return 0;
 }
 #endif
 #endif
@@ -1036,11 +1001,12 @@ static int mdnie_probe(struct platform_device *pdev)
 	dev_set_drvdata(mdnie->dev, mdnie);
 
 #ifdef CONFIG_HAS_WAKELOCK
-#ifdef CONFIG_FB
+#ifdef CONFIG_HAS_EARLYSUSPEND
 #if 1 /* defined(CONFIG_FB_MDNIE_PWM) */
-	mdnie->fb_suspended = false;
-	mdnie->fb_notif.notifier_call = mdnie_fb_notifier_callback;
-	fb_register_client(&mdnie->fb_notif);
+	mdnie->early_suspend.suspend = mdnie_early_suspend;
+	mdnie->early_suspend.resume = mdnie_late_resume;
+	mdnie->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
+	register_early_suspend(&mdnie->early_suspend);
 #endif
 #endif
 #endif
@@ -1140,7 +1106,7 @@ static struct platform_driver mdnie_driver = {
 	},
 	.probe		= mdnie_probe,
 	.remove		= mdnie_remove,
-#ifndef CONFIG_FB
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend	= mdnie_suspend,
 	.resume		= mdnie_resume,
 #endif
