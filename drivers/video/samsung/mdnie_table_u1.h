@@ -923,16 +923,12 @@ struct mdnie_tuning_info tuning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 		{
 			{"dynamic_ui",		tune_dynamic_ui},
 			{"dynamic_video",	tune_dynamic_video},
-			{"dynamic_video",	tune_dynamic_video},
-			{"dynamic_video",	tune_dynamic_video},
 			{"camera",		tune_camera},
 			{"dynamic_ui",		tune_dynamic_ui},
 			{"dynamic_gallery",	tune_dynamic_gallery},
 			{"dynamic_vt",		tune_dynamic_vt}
 		}, {
 			{"standard_ui",		tune_standard_ui},
-			{"standard_video",	tune_standard_video},
-			{"standard_video",	tune_standard_video},
 			{"standard_video",	tune_standard_video},
 			{"camera",		tune_camera},
 			{"standard_ui",		tune_standard_ui},
@@ -941,16 +937,12 @@ struct mdnie_tuning_info tuning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 		}, {
 			{"natural_ui",		tune_natural_ui},
 			{"natural_video",	tune_natural_video},
-			{"natural_video",	tune_natural_video},
-			{"natural_video",	tune_natural_video},
 			{"camera",		tune_camera},
 			{"natural_ui",		tune_natural_ui},
 			{"natural_gallery",	tune_natural_gallery},
 			{"natural_vt",		tune_natural_vt}
 		}, {
 			{"movie_ui",		tune_movie_ui},
-			{"movie_video",		tune_movie_video},
-			{"movie_video",		tune_movie_video},
 			{"movie_video",		tune_movie_video},
 			{"camera",		tune_camera},
 			{"movie_ui",		tune_movie_ui},
