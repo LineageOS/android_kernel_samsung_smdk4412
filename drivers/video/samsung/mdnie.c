@@ -881,6 +881,40 @@ static ssize_t store_rgb_adj_enable(struct device *dev,
 	mdnie_update(mdnie);
 	return size;
 }
+
+static ssize_t show_sensorRGB(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	char *pos = buf;
+
+	pos += sprintf(pos, "%d ", mdnie->r_adj);
+	pos += sprintf(pos, "%d ", mdnie->g_adj);
+	pos += sprintf(pos, "%d", mdnie->b_adj);
+	pos += sprintf(pos, "\n");
+
+	return pos - buf;
+}
+
+static ssize_t store_sensorRGB(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	unsigned int s[3];
+	int ret;
+
+	ret = sscanf(buf, "%d %d %d", &s[0], &s[1], &s[2]);
+	if (ret < 0)
+		return ret;
+
+	mdnie->r_adj = s[0];
+	mdnie->g_adj = s[1];
+	mdnie->b_adj = s[2];
+
+	mdnie_update(mdnie);
+
+	return count;
+}
 #endif
 
 #if !defined(CONFIG_FB_MDNIE_PWM)
@@ -921,6 +955,7 @@ static struct device_attribute mdnie_attributes[] = {
 	__ATTR(g_adj, 0666, show_g_adj, store_g_adj),
 	__ATTR(b_adj, 0666, show_b_adj, store_b_adj),
 	__ATTR(rgb_adj_enable, 0666, show_rgb_adj_enable, store_rgb_adj_enable),
+	__ATTR(sensorRGB, 0666, show_sensorRGB, store_sensorRGB),
 #endif
 	__ATTR_NULL,
 };
