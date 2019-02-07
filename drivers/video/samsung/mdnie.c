@@ -829,6 +829,17 @@ static ssize_t accessibility_store(struct device *dev,
 
 	return count;
 }
+
+static ssize_t accessibility_max_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	char *pos = buf;
+
+	pos += sprintf(pos, "%d\n", ACCESSIBILITY_MAX);
+
+	return pos - buf;
+}
+
 #ifdef CONFIG_FB_MDNIE_RGB_ADJUST
 #define ADJ_ATTR(name) \
 static ssize_t show_##name (struct device *dev, \
@@ -947,6 +958,7 @@ static struct device_attribute mdnie_attributes[] = {
 #endif
 	__ATTR(tuning, 0664, tuning_show, tuning_store),
 	__ATTR(accessibility, 0664, accessibility_show, accessibility_store),
+	__ATTR(accessibility_max, 0664, accessibility_max_show, NULL),
 #if !defined(CONFIG_FB_MDNIE_PWM)
 	__ATTR(color_correct, 0444, color_correct_show, NULL),
 #endif
