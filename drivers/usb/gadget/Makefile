@@ -79,4 +79,3 @@ obj-$(CONFIG_USB_ANDROID_ADB)	+= gadget_gbhc/f_adb.o
 obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= gadget_gbhc/f_mass_storage.o
 obj-$(CONFIG_USB_ANDROID_MTP)	+= gadget_gbhc/f_mtp.o
 obj-$(CONFIG_USB_ANDROID_RNDIS)	+= gadget_gbhc/f_rndis.o gadget_gbhc/u_ether.o
-obj-$(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)	+= multi_config.o

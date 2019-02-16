@@ -816,19 +816,13 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (alt > 1)
 			goto fail;
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-		if (alt == 0) {
-#endif
-			if (ncm->port.in_ep->driver_data) {
-				DBG(cdev, "reset ncm\n");
-				printk(KERN_DEBUG "usb: %s gether_disconnect\n",
-						__func__);
-				gether_disconnect(&ncm->port);
-				ncm_reset_values(ncm);
-			}
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+		if (ncm->port.in_ep->driver_data) {
+			DBG(cdev, "reset ncm\n");
+			printk(KERN_DEBUG "usb: %s gether_disconnect\n",
+					__func__);
+			gether_disconnect(&ncm->port);
+			ncm_reset_values(ncm);
 		}
-#endif
 
 		/*
 		 * CDC Network only sends data in non-default altsettings.
@@ -861,17 +855,9 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 				return PTR_ERR(net);
 		}
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-		/*
-		 * we don't need below code, because devguru host driver can't
-		 * accpet SpeedChange/Connect Notify while Alterate Setting
-		 * which call ncm_set_alt()
-		 */
-#else
 		spin_lock(&ncm->lock);
 		ncm_notify(ncm);
 		spin_unlock(&ncm->lock);
-#endif
 	} else
 		goto fail;
 
@@ -1407,11 +1393,7 @@ int ncm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	ncm_reset_values(ncm);
 	ncm->port.is_fixed = true;
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	ncm->port.func.name = "ncm";
-#else
 	ncm->port.func.name = "cdc_network";
-#endif
 	ncm->port.func.strings = ncm_strings;
 	/* descriptors are per-instance copies */
 	ncm->port.func.bind = ncm_bind;

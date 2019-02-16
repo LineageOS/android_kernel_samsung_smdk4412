@@ -20,9 +20,6 @@
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-#include <linux/usb/composite.h>
-#endif
 static u8 clear_feature_num;
 static int clear_feature_flag;
 static int set_conf_done;
@@ -534,22 +531,12 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 				reset_available = 1;
 			}
 		} else {
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-			struct usb_composite_dev *cdev;
-#endif
 			reset_available = 1;
 			DEBUG_ISR("\t\tRESET handling skipped\n");
 			__pm_wakeup_event(&dev->usbd_wake_lock, 5000);
 			printk(KERN_DEBUG "usb: reset\n");
 			/* report disconnect; the driver is already quiesced */
 			if (dev->driver) {
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-				cdev = get_gadget_data(&dev->gadget);
-				if (cdev != NULL) {
-					cdev->mute_switch = 0;
-					cdev->force_disconnect = 1;
-				}
-#endif
 				spin_unlock(&dev->lock);
 #if defined(CONFIG_MACH_M0_CMCC)
 				pr_info("[YSJ][%s] disconnect gadget",

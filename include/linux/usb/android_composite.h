@@ -99,12 +99,7 @@ struct acm_platform_data {
 	u8	num_inst;
 };
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-int register_usb_composite_notifier(struct notifier_block *notifier);
-int unregister_usb_composite_notifier(struct notifier_block *notifier);
-#else
 #define register_usb_composite_notifier		NULL
 #define unregister_usb_composite_notifier	NULL
-#endif
 
 #endif	/* __LINUX_USB_ANDROID_H */

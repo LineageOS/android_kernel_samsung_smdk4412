@@ -1025,15 +1025,6 @@ config USB_G_ANDROID
 	  The functions can be configured via a board file and may be
 	  enabled and disabled dynamically.
 
-config USB_ANDROID_SAMSUNG_COMPOSITE
-	boolean "Samsung Composite function"
-	depends on USB_G_ANDROID
-	help
-	  Provides SAMSUNG composite driver.
-	  It also provides KIES connection and
-	  Multi Configuration.
-	  If you enable this option, android composite will be changed.
-
 config USB_ANDROID_SAMSUNG_MTP
 	boolean "Samsung MTP function"
 	depends on USB_G_ANDROID

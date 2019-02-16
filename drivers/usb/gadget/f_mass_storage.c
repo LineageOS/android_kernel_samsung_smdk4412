@@ -297,12 +297,6 @@
 
 #include "gadget_chips.h"
 
-#ifdef CONFIG_USB_CDFS_SUPPORT
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-#define _SUPPORT_MAC_   /* support to recognize CDFS on OSX (MAC PC) */
-#endif
-#endif
-
 /*------------------------------------------------------------------------*/
 
 #define FSG_DRIVER_DESC		"Mass Storage Function"
@@ -411,11 +405,6 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	char vendor_string[8 + 1];
-	char product_string[16 + 1];
-#endif
-
 	struct kref		ref;
 };
 
@@ -461,62 +450,6 @@ struct fsg_dev {
 	struct usb_ep		*bulk_out;
 };
 
-#ifdef CONFIG_USB_CDFS_SUPPORT
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-static int send_message(struct fsg_common *common, char *msg)
-{
-	char name_buf[120];
-	char state_buf[120];
-	char *envp[3];
-	int env_offset = 0;
-	struct usb_gadget *gadget = common->gadget;
-
-	DBG(common, "%s called\n", __func__);
-	printk(KERN_INFO "%s (%s)\n", __func__, msg);
-
-	if (gadget) {
-		snprintf(name_buf, sizeof(name_buf),
-					"SWITCH_NAME=USB_MESSAGE");
-		envp[env_offset++] = name_buf;
-
-		snprintf(state_buf, sizeof(state_buf),
-				"SWITCH_STATE=%s", msg);
-		envp[env_offset++] = state_buf;
-
-		envp[env_offset] = NULL;
-
-		if (!gadget->dev.class) {
-			gadget->dev.class = class_create(THIS_MODULE,
-					"usb_msg");
-			if (IS_ERR(gadget->dev.class))
-				return -1;
-		}
-
-		DBG(common, "Send cd eject message to daemon\n");
-
-		kobject_uevent_env(&gadget->dev.kobj, KOBJ_CHANGE, envp);
-	}
-
-	return 0;
-}
-
-static int do_autorun_check(struct fsg_common *common)
-{
-	printk(KERN_INFO "%s called\n", __func__);
-	send_message(common, "autorun");
-
-	return 0;
-}
-
-static int do_switch_atmode(struct fsg_common *common)
-{
-	printk(KERN_INFO "%s called\n", __func__);
-	send_message(common, "Load AT");
-
-	return 0;
-}
-#endif /* CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE */
-#endif
 static inline int __fsg_is_set(struct fsg_common *common,
 			       const char *func, unsigned line)
 {
@@ -1562,9 +1495,6 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun *curlun = common->curlun;
 	u8	*buf = (u8 *) bh->buf;
-#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
-	static char new_product_name[16 + 1];
-#endif
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -1583,22 +1513,6 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[6] = 0;
 	buf[7] = 0;
 
-#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
-	strncpy(new_product_name, common->product_string, 16);
-	new_product_name[16] = '\0';
-	if (common->product_string[0] &&
-	    strlen(common->product_string) <= 11 && /* check string length */
-	    common->lun > 0) {
-		strncat(new_product_name, " Card", 16);
-		new_product_name[16] = '\0';
-	}
-
-	snprintf(common->inquiry_string,
-		sizeof common->inquiry_string,
-		"%-8s%-16s%04x",
-		common->vendor_string,
-		new_product_name, 1);
-#endif
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
 	return 36;
 }
@@ -1843,12 +1757,6 @@ static int do_start_stop(struct fsg_common *common)
 	 * available for use as soon as it is loaded.
 	 */
 	if (start) {
-#if defined(CONFIG_USB_CDFS_SUPPORT)
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-		if (loej)
-			send_message(common, "Load AT");
-#endif
-#endif
 		if (!fsg_lun_is_open(curlun)) {
 			curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
 			return -EINVAL;
@@ -1881,12 +1789,6 @@ static int do_start_stop(struct fsg_common *common)
 	fsg_lun_close(curlun);
 	up_write(&common->filesem);
 	down_read(&common->filesem);
-
-#if defined(CONFIG_USB_CDFS_SUPPORT)
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	send_message(common, "Load User");
-#endif
-#endif
 
 	return common->ops && common->ops->post_eject
 		? min(0, common->ops->post_eject(common, curlun,
@@ -2573,43 +2475,12 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_write(common);
 		break;
 
-#if defined(CONFIG_USB_CDFS_SUPPORT)
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	case RELEASE:	/* SC_AUTORUN_CHECK0 : 0x17 */
-		reply = do_switch_atmode(common);
-		break;
-
-	case RESERVE:	/* SC_AUTORUN_CHECK1 : 0x16 */
-		reply = do_autorun_check(common);
-		break;
-
-#ifdef _SUPPORT_MAC_
-	case READ_CD:
-		common->data_size_from_cmnd = ((common->cmnd[6] << 16)
-						| (common->cmnd[7] << 8)
-						| (common->cmnd[8])) << 9;
-		reply = check_command(common, 12, DATA_DIR_TO_HOST,
-					(0xf<<2) | (7<<7), 1,
-					"READ CD");
-		if (reply == 0)
-			reply = do_read_cd(common);
-		break;
-
-#endif /* _SUPPORT_MAC_ */
-#endif
-#endif
 	/* Some mandatory commands that we recognize but don't implement.
 	 * They don't mean much in this setting.  It's left as an exercise
 	 * for anyone interested to implement RESERVE and RELEASE in terms
 	 * of Posix locks.
 	 */
 	case FORMAT_UNIT:
-#ifndef CONFIG_USB_CDFS_SUPPORT
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	case RELEASE:
-	case RESERVE:
-#endif
-#endif
 	case SEND_DIAGNOSTIC:
 		/* Fall through */
 
@@ -3230,9 +3101,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		curlun->ro = lcfg->cdrom || lcfg->ro;
 		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-		curlun->nofua = lcfg->nofua;
-#endif
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
@@ -3313,15 +3181,6 @@ buffhds_first_it:
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
-
-#ifdef	CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	/* Default INQUIRY strings */
-	strncpy(common->vendor_string, "SAMSUNG",
-			sizeof(common->vendor_string) - 1);
-	strncpy(common->product_string, "File-Stor Gadget",
-			sizeof(common->product_string) - 1);
-	common->product_string[sizeof(common->product_string) - 1] = '\0';
-#endif
 
 	/*
 	 * Some peripheral controllers are known not to be able to

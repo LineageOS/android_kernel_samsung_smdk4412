@@ -123,11 +123,6 @@ struct usb_function {
 
 	struct usb_configuration	*config;
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	int	(*set_intf_num)(struct usb_function *f,
-			int intf_num, int index_num);
-	int	(*set_config_desc)(int conf_num);
-#endif
 #ifdef CONFIG_USB_ANDROID
 	/* disabled is zero if the function is enabled */
 	int				disabled;
@@ -414,14 +409,6 @@ struct usb_composite_dev {
 	bool				connected;
 
 	struct work_struct switch_work;
-#endif
-
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	/* used by enable_store function of android.c
-	 * to avoid signalling switch changes
-	 */
-	bool                            mute_switch;
-	bool                            force_disconnect;
 #endif
 };
 
