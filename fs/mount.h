@@ -15,3 +15,4 @@ static inline int mnt_has_parent(struct vfsmount *mnt)
 }
 
 extern struct mount *__lookup_mnt(struct vfsmount *, struct dentry *, int);
+
