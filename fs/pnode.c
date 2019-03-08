@@ -334,10 +334,8 @@ static void __propagate_umount(struct vfsmount *mnt)
 		 * umount the child only if the child has no
 		 * other children
 		 */
-		if (child && list_empty(&child->mnt_mounts)) {
-			list_del_init(&child->mnt_child);
+		if (child && list_empty(&child->mnt_mounts))
 			list_move_tail(&child->mnt_hash, &mnt->mnt_hash);
-		}
 	}
 }
 
