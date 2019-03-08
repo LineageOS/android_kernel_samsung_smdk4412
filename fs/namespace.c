@@ -1889,7 +1889,8 @@ static int do_move_mount(struct path *path, char *old_name)
 	/*
 	 * Don't move a mount residing in a shared parent.
 	 */
-	if (IS_MNT_SHARED(old_path.mnt->mnt_parent))
+	if (old_path.mnt->mnt_parent &&
+	    IS_MNT_SHARED(old_path.mnt->mnt_parent))
 		goto out1;
 	/*
 	 * Don't move a mount tree containing unbindable mounts to a destination
@@ -2544,31 +2545,6 @@ out_type:
 }
 
 /*
- * Return true if path is reachable from root
- *
- * namespace_sem or vfsmount_lock is held
- */
-bool is_path_reachable(struct vfsmount *mnt, struct dentry *dentry,
-			 const struct path *root)
-{
-	while (mnt != root->mnt && mnt_has_parent(mnt)) {
-		dentry = mnt->mnt_mountpoint;
-		mnt = mnt->mnt_parent;
-	}
-	return mnt == root->mnt && is_subdir(dentry, root->dentry);
-}
-
-int path_is_under(struct path *path1, struct path *path2)
-{
-	int res;
-	br_read_lock(vfsmount_lock);
-	res = is_path_reachable(path1->mnt, path1->dentry, path2);
-	br_read_unlock(vfsmount_lock);
-	return res;
-}
-EXPORT_SYMBOL(path_is_under);
-
-/*
  * pivot_root Semantics:
  * Moves the root file system of the current process to the directory put_old,
  * makes new_root as the new root file system of the current process, and sets
@@ -2596,6 +2572,7 @@ EXPORT_SYMBOL(path_is_under);
 SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 		const char __user *, put_old)
 {
+	struct vfsmount *tmp;
 	struct path new, old, parent_path, root_parent, root;
 	int error;
 
@@ -2645,7 +2622,18 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	if (!mnt_has_parent(new.mnt))
 		goto out4; /* not attached */
 	/* make sure we can reach put_old from new_root */
-	if (!is_path_reachable(old.mnt, old.dentry, &new))
+	tmp = old.mnt;
+	if (tmp != new.mnt) {
+		for (;;) {
+			if (!mnt_has_parent(tmp))
+				goto out4; /* already mounted on put_old */
+			if (tmp->mnt_parent == new.mnt)
+				break;
+			tmp = tmp->mnt_parent;
+		}
+		if (!is_subdir(tmp->mnt_mountpoint, new.dentry))
+			goto out4;
+	} else if (!is_subdir(old.dentry, new.dentry))
 		goto out4;
 	/* make certain new is below the root */
 	if (!is_path_reachable(new.mnt, new.dentry, &root))
