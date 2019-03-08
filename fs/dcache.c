@@ -37,7 +37,6 @@
 #include <linux/rculist_bl.h>
 #include <linux/prefetch.h>
 #include "internal.h"
-#include "mount.h"
 
 /*
  * Usage:
@@ -2573,8 +2572,9 @@ static int prepend_path(const struct path *path,
 
 		if (dentry == vfsmnt->mnt_root || IS_ROOT(dentry)) {
 			/* Global root? */
-			if (!mnt_has_parent(vfsmnt))
+			if (vfsmnt->mnt_parent == vfsmnt) {
 				goto global_root;
+			}
 			dentry = vfsmnt->mnt_mountpoint;
 			vfsmnt = vfsmnt->mnt_parent;
 			continue;
@@ -2974,7 +2974,7 @@ int path_is_under(struct path *path1, struct path *path2)
 	br_read_lock(vfsmount_lock);
 	if (mnt != path2->mnt) {
 		for (;;) {
-			if (!mnt_has_parent(mnt)) {
+			if (mnt->mnt_parent == mnt) {
 				br_read_unlock(vfsmount_lock);
 				return 0;
 			}
