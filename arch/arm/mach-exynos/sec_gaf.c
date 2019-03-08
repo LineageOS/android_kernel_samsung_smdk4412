@@ -9,6 +9,7 @@
 #include <linux/fs.h>
 #include <linux/mount.h>
 #include <asm/pgtable.h>
+#include "../../../fs/mount.h"
 
 static struct GAForensicINFO {
 	unsigned short ver;
@@ -115,9 +116,9 @@ static struct GAForensicINFO {
 	.dentry_struct_d_parent = offsetof(struct dentry, d_parent),
 	.dentry_struct_d_name = offsetof(struct dentry, d_name),
 	.qstr_struct_name = offsetof(struct qstr, name),
-	.vfsmount_struct_mnt_mountpoint = offsetof(struct vfsmount, mnt_mountpoint),
-	.vfsmount_struct_mnt_root = offsetof(struct vfsmount, mnt_root),
-	.vfsmount_struct_mnt_parent = offsetof(struct vfsmount, mnt_parent),
+	.vfsmount_struct_mnt_mountpoint = offsetof(struct mount, mnt_mountpoint),
+	.vfsmount_struct_mnt_root = offsetof(struct mount, mnt.mnt_root),
+	.vfsmount_struct_mnt_parent = offsetof(struct mount, mnt_parent),
 	.pgdir_shift = PGDIR_SHIFT,
 	.ptrs_per_pte = PTRS_PER_PTE,
 	/* .phys_offset = PHYS_OFFSET, */
