@@ -5,7 +5,7 @@
  *  changes by Thomas Schoebel-Theuer
  */
 
-#include <linux/export.h>
+#include <linux/module.h>
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/string.h>

@@ -3,7 +3,7 @@
  *	Library for filesystems writers.
  */
 
-#include <linux/export.h>
+#include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/mount.h>
