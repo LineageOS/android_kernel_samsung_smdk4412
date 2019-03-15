@@ -340,7 +340,6 @@ static void dentry_lru_add(struct dentry *dentry)
 static void __dentry_lru_del(struct dentry *dentry)
 {
 	list_del_init(&dentry->d_lru);
-	dentry->d_flags &= ~DCACHE_SHRINK_LIST;
 	dentry->d_sb->s_nr_dentry_unused--;
 	dentry_stat.nr_unused--;
 }
@@ -885,7 +884,6 @@ relock:
 			spin_unlock(&dentry->d_lock);
 		} else {
 			list_move_tail(&dentry->d_lru, &tmp);
-			dentry->d_flags |= DCACHE_SHRINK_LIST;
 			spin_unlock(&dentry->d_lock);
 			if (!--count)
 				break;
@@ -1192,18 +1190,14 @@ resume:
 		/* 
 		 * move only zero ref count dentries to the end 
 		 * of the unused list for prune_dcache
-		 *
-		 * Those which are presently on the shrink list, being processed
-		 * by shrink_dentry_list(), shouldn't be moved.  Otherwise the
-		 * loop in shrink_dcache_parent() might not make any progress
-		 * and loop forever.
 		 */
-		if (dentry->d_count) {
-			dentry_lru_del(dentry);
-		} else if (!(dentry->d_flags & DCACHE_SHRINK_LIST)) {
+		if (!dentry->d_count) {
 			dentry_lru_move_tail(dentry);
 			found++;
+		} else {
+			dentry_lru_del(dentry);
 		}
+
 		/*
 		 * We can return to the caller if we have found some (this
 		 * ensures forward progress). We'll be coming back to find
