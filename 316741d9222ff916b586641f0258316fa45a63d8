@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5daa162e_ce652283",
+        "filename": "net/key/af_key.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 203,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2019-03-16T18:56:55Z",
+      "side": 1,
+      "message": "sk-\u003esk_data_ready(sk, skb-\u003elen);",
+      "range": {
+        "startLine": 203,
+        "startChar": 2,
+        "endLine": 203,
+        "endChar": 38
+      },
+      "revId": "316741d9222ff916b586641f0258316fa45a63d8",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
