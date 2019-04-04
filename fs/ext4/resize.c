@@ -394,15 +394,15 @@ static int verify_reserved_gdb(struct super_block *sb,
  * fail once we start modifying the data on disk, because JBD has no rollback.
  */
 static int add_new_gdb(handle_t *handle, struct inode *inode,
-		       ext4_group_t group)
+		       struct ext4_new_group_data *input,
+		       struct buffer_head **primary)
 {
 	struct super_block *sb = inode->i_sb;
 	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
-	unsigned long gdb_num = group / EXT4_DESC_PER_BLOCK(sb);
+	unsigned long gdb_num = input->group / EXT4_DESC_PER_BLOCK(sb);
 	ext4_fsblk_t gdblock = EXT4_SB(sb)->s_sbh->b_blocknr + 1 + gdb_num;
 	struct buffer_head **o_group_desc, **n_group_desc;
 	struct buffer_head *dind;
-	struct buffer_head *gdb_bh;
 	int gdbackups;
 	struct ext4_iloc iloc;
 	__le32 *data;
@@ -425,12 +425,11 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 		return -EPERM;
 	}
 
-	gdb_bh = sb_bread(sb, gdblock);
-	if (!gdb_bh)
+	*primary = sb_bread(sb, gdblock);
+	if (!*primary)
 		return -EIO;
 
-	gdbackups = verify_reserved_gdb(sb, gdb_bh);
-	if (gdbackups < 0) {
+	if ((gdbackups = verify_reserved_gdb(sb, *primary)) < 0) {
 		err = gdbackups;
 		goto exit_bh;
 	}
@@ -445,7 +444,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	data = (__le32 *)dind->b_data;
 	if (le32_to_cpu(data[gdb_num % EXT4_ADDR_PER_BLOCK(sb)]) != gdblock) {
 		ext4_warning(sb, "new group %u GDT block %llu not reserved",
-			     group, gdblock);
+			     input->group, gdblock);
 		err = -EINVAL;
 		goto exit_dind;
 	}
@@ -454,7 +453,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	if (unlikely(err))
 		goto exit_dind;
 
-	err = ext4_journal_get_write_access(handle, gdb_bh);
+	err = ext4_journal_get_write_access(handle, *primary);
 	if (unlikely(err))
 		goto exit_sbh;
 
@@ -493,8 +492,8 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	}
 	inode->i_blocks -= (gdbackups + 1) * sb->s_blocksize >> 9;
 	ext4_mark_iloc_dirty(handle, inode, &iloc);
-	memset(gdb_bh->b_data, 0, sb->s_blocksize);
-	err = ext4_handle_dirty_metadata(handle, NULL, gdb_bh);
+	memset((*primary)->b_data, 0, sb->s_blocksize);
+	err = ext4_handle_dirty_metadata(handle, NULL, *primary);
 	if (unlikely(err)) {
 		ext4_std_error(sb, err);
 		goto exit_inode;
@@ -504,7 +503,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	o_group_desc = EXT4_SB(sb)->s_group_desc;
 	memcpy(n_group_desc, o_group_desc,
 	       EXT4_SB(sb)->s_gdb_count * sizeof(struct buffer_head *));
-	n_group_desc[gdb_num] = gdb_bh;
+	n_group_desc[gdb_num] = *primary;
 	EXT4_SB(sb)->s_group_desc = n_group_desc;
 	EXT4_SB(sb)->s_gdb_count++;
 	kfree(o_group_desc);
@@ -527,7 +526,7 @@ exit_sbh:
 exit_dind:
 	brelse(dind);
 exit_bh:
-	brelse(gdb_bh);
+	brelse(*primary);
 
 	ext4_debug("leaving with error %d\n", err);
 	return err;
@@ -835,16 +834,8 @@ int ext4_group_add(struct super_block *sb, struct ext4_new_group_data *input)
 		if (reserved_gdb && ext4_bg_num_gdb(sb, input->group) &&
 		    (err = reserve_backup_gdb(handle, inode, input)))
 			goto exit_journal;
-	} else {
-		/*
-		 * Note that we can access new group descriptor block safely
-		 * only if add_new_gdb() succeeds.
-		 */
-		err = add_new_gdb(handle, inode, input->group);
-		if (err)
-			goto exit_journal;
-		primary = sbi->s_group_desc[gdb_num];
-	}
+	} else if ((err = add_new_gdb(handle, inode, input, &primary)))
+		goto exit_journal;
 
         /*
          * OK, now we've set up the new group.  Time to make it active.
@@ -954,7 +945,7 @@ int ext4_group_add(struct super_block *sb, struct ext4_new_group_data *input)
 exit_journal:
 	if ((err2 = ext4_journal_stop(handle)) && !err)
 		err = err2;
-	if (!err && primary) {
+	if (!err) {
 		update_backups(sb, sbi->s_sbh->b_blocknr, (char *)es,
 			       sizeof(struct ext4_super_block));
 		update_backups(sb, primary->b_blocknr, primary->b_data,
