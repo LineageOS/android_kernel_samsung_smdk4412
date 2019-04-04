@@ -23,6 +23,9 @@
 
 #include <trace/events/ext4.h>
 
+static unsigned int num_base_meta_blocks(struct super_block *sb,
+					 ext4_group_t block_group);
+
 /*
  * balloc.c contains the blocks allocation and deallocation routines
  */
@@ -55,87 +58,37 @@ static int ext4_block_in_group(struct super_block *sb, ext4_fsblk_t block,
 	return 0;
 }
 
-/* Return the number of clusters used for file system metadata; this
- * represents the overhead needed by the file system.
- */
-unsigned ext4_num_overhead_clusters(struct super_block *sb,
-				    ext4_group_t block_group,
-				    struct ext4_group_desc *gdp)
+static int ext4_group_used_meta_blocks(struct super_block *sb,
+				       ext4_group_t block_group,
+				       struct ext4_group_desc *gdp)
 {
-	unsigned num_clusters;
-	int block_cluster = -1, inode_cluster = -1, itbl_cluster = -1, i, c;
-	ext4_fsblk_t start = ext4_group_first_block_no(sb, block_group);
-	ext4_fsblk_t itbl_blk;
+	ext4_fsblk_t tmp;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
+	/* block bitmap, inode bitmap, and inode table blocks */
+	int used_blocks = sbi->s_itb_per_group + 2;
 
-	/* This is the number of clusters used by the superblock,
-	 * block group descriptors, and reserved block group
-	 * descriptor blocks */
-	num_clusters = ext4_num_base_meta_clusters(sb, block_group);
+	if (EXT4_HAS_INCOMPAT_FEATURE(sb, EXT4_FEATURE_INCOMPAT_FLEX_BG)) {
+		if (!ext4_block_in_group(sb, ext4_block_bitmap(sb, gdp),
+					block_group))
+			used_blocks--;
 
-	/*
-	 * For the allocation bitmaps and inode table, we first need
-	 * to check to see if the block is in the block group.  If it
-	 * is, then check to see if the cluster is already accounted
-	 * for in the clusters used for the base metadata cluster, or
-	 * if we can increment the base metadata cluster to include
-	 * that block.  Otherwise, we will have to track the cluster
-	 * used for the allocation bitmap or inode table explicitly.
-	 * Normally all of these blocks are contiguous, so the special
-	 * case handling shouldn't be necessary except for *very*
-	 * unusual file system layouts.
-	 */
-	if (ext4_block_in_group(sb, ext4_block_bitmap(sb, gdp), block_group)) {
-		block_cluster = EXT4_B2C(sbi, (start -
-					       ext4_block_bitmap(sb, gdp)));
-		if (block_cluster < num_clusters)
-			block_cluster = -1;
-		else if (block_cluster == num_clusters) {
-			num_clusters++;
-			block_cluster = -1;
+		if (!ext4_block_in_group(sb, ext4_inode_bitmap(sb, gdp),
+					block_group))
+			used_blocks--;
+
+		tmp = ext4_inode_table(sb, gdp);
+		for (; tmp < ext4_inode_table(sb, gdp) +
+				sbi->s_itb_per_group; tmp++) {
+			if (!ext4_block_in_group(sb, tmp, block_group))
+				used_blocks -= 1;
 		}
 	}
-
-	if (ext4_block_in_group(sb, ext4_inode_bitmap(sb, gdp), block_group)) {
-		inode_cluster = EXT4_B2C(sbi,
-					 start - ext4_inode_bitmap(sb, gdp));
-		if (inode_cluster < num_clusters)
-			inode_cluster = -1;
-		else if (inode_cluster == num_clusters) {
-			num_clusters++;
-			inode_cluster = -1;
-		}
-	}
-
-	itbl_blk = ext4_inode_table(sb, gdp);
-	for (i = 0; i < sbi->s_itb_per_group; i++) {
-		if (ext4_block_in_group(sb, itbl_blk + i, block_group)) {
-			c = EXT4_B2C(sbi, start - itbl_blk + i);
-			if ((c < num_clusters) || (c == inode_cluster) ||
-			    (c == block_cluster) || (c == itbl_cluster))
-				continue;
-			if (c == num_clusters) {
-				num_clusters++;
-				continue;
-			}
-			num_clusters++;
-			itbl_cluster = c;
-		}
-	}
-
-	if (block_cluster != -1)
-		num_clusters++;
-	if (inode_cluster != -1)
-		num_clusters++;
-
-	return num_clusters;
+	return used_blocks;
 }
 
-static unsigned int num_clusters_in_group(struct super_block *sb,
-					  ext4_group_t block_group)
+static unsigned int num_blocks_in_group(struct super_block *sb,
+					ext4_group_t block_group)
 {
-	unsigned int blocks;
-
 	if (block_group == ext4_get_groups_count(sb) - 1) {
 		/*
 		 * Even though mke2fs always initializes the first and
@@ -143,11 +96,10 @@ static unsigned int num_clusters_in_group(struct super_block *sb,
 		 * we need to make sure we calculate the right free
 		 * blocks.
 		 */
-		blocks = ext4_blocks_count(EXT4_SB(sb)->s_es) -
+		return ext4_blocks_count(EXT4_SB(sb)->s_es) -
 			ext4_group_first_block_no(sb, block_group);
 	} else
-		blocks = EXT4_BLOCKS_PER_GROUP(sb);
-	return EXT4_NUM_B2C(EXT4_SB(sb), blocks);
+		return EXT4_BLOCKS_PER_GROUP(sb);
 }
 
 /* Initializes an uninitialized block bitmap */
@@ -155,7 +107,7 @@ void ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
 			    ext4_group_t block_group,
 			    struct ext4_group_desc *gdp)
 {
-	unsigned int bit, bit_max;
+	unsigned int bit, bit_max = num_base_meta_blocks(sb, block_group);
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	ext4_fsblk_t start, tmp;
 	int flex_bg = 0;
@@ -174,7 +126,6 @@ void ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
 	}
 	memset(bh->b_data, 0, sb->s_blocksize);
 
-	bit_max = ext4_num_base_meta_clusters(sb, block_group);
 	for (bit = 0; bit < bit_max; bit++)
 		ext4_set_bit(bit, bh->b_data);
 
@@ -186,25 +137,24 @@ void ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
 	/* Set bits for block and inode bitmaps, and inode table */
 	tmp = ext4_block_bitmap(sb, gdp);
 	if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
-		ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+		ext4_set_bit(tmp - start, bh->b_data);
 
 	tmp = ext4_inode_bitmap(sb, gdp);
 	if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
-		ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+		ext4_set_bit(tmp - start, bh->b_data);
 
 	tmp = ext4_inode_table(sb, gdp);
 	for (; tmp < ext4_inode_table(sb, gdp) +
 		     sbi->s_itb_per_group; tmp++) {
 		if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
-			ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+			ext4_set_bit(tmp - start, bh->b_data);
 	}
-
 	/*
 	 * Also if the number of blocks within the group is less than
 	 * the blocksize * 8 ( which is the size of bitmap ), set rest
 	 * of the block bitmap to 1
 	 */
-	ext4_mark_bitmap_end(num_clusters_in_group(sb, block_group),
+	ext4_mark_bitmap_end(num_blocks_in_group(sb, block_group),
 			     sb->s_blocksize * 8, bh->b_data);
 }
 
@@ -215,8 +165,9 @@ unsigned ext4_free_blocks_after_init(struct super_block *sb,
 				     ext4_group_t block_group,
 				     struct ext4_group_desc *gdp)
 {
-	return num_clusters_in_group(sb, block_group) - 
-		ext4_num_overhead_clusters(sb, block_group, gdp);
+	return num_blocks_in_group(sb, block_group) -
+		num_base_meta_blocks(sb, block_group) -
+		ext4_group_used_meta_blocks(sb, block_group, gdp);
 }
 
 /*
@@ -661,14 +612,14 @@ unsigned long ext4_bg_num_gdb(struct super_block *sb, ext4_group_t group)
 }
 
 /*
- * This function returns the number of file system metadata clusters at
+ * This function returns the number of file system metadata blocks at
  * the beginning of a block group, including the reserved gdt blocks.
  */
-unsigned ext4_num_base_meta_clusters(struct super_block *sb,
-				     ext4_group_t block_group)
+static unsigned int num_base_meta_blocks(struct super_block *sb,
+					 ext4_group_t block_group)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
-	unsigned num;
+	int num;
 
 	/* Check for superblock and gdt backups in this group */
 	num = ext4_bg_has_super(sb, block_group);
@@ -683,7 +634,7 @@ unsigned ext4_num_base_meta_clusters(struct super_block *sb,
 	} else { /* For META_BG_BLOCK_GROUPS */
 		num += ext4_bg_num_gdb(sb, block_group);
 	}
-	return EXT4_NUM_B2C(sbi, num);
+	return num;
 }
 /**
  *	ext4_inode_to_goal_block - return a hint for block allocation
