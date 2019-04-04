@@ -492,11 +492,10 @@ static void mb_cmp_bitmaps(struct ext4_buddy *e4b, void *bitmap)
 		b2 = (unsigned char *) bitmap;
 		for (i = 0; i < e4b->bd_sb->s_blocksize; i++) {
 			if (b1[i] != b2[i]) {
-				ext4_msg(e4b->bd_sb, KERN_ERR,
-					 "corruption in group %u "
-					 "at byte %u(%u): %x in copy != %x "
-					 "on disk/prealloc",
-					 e4b->bd_group, i, i * 8, b1[i], b2[i]);
+				printk(KERN_ERR "corruption in group %u "
+				       "at byte %u(%u): %x in copy != %x "
+				       "on disk/prealloc\n",
+				       e4b->bd_group, i, i * 8, b1[i], b2[i]);
 				BUG();
 			}
 		}
@@ -2235,8 +2234,8 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 			EXT4_DESC_PER_BLOCK_BITS(sb);
 		meta_group_info = kmalloc(metalen, GFP_KERNEL);
 		if (meta_group_info == NULL) {
-			ext4_msg(sb, KERN_ERR, "EXT4-fs: can't allocate mem "
-				 "for a buddy group");
+			printk(KERN_ERR "EXT4-fs: can't allocate mem for a "
+			       "buddy group\n");
 			goto exit_meta_group_info;
 		}
 		sbi->s_group_info[group >> EXT4_DESC_PER_BLOCK_BITS(sb)] =
@@ -2249,7 +2248,7 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 
 	meta_group_info[i] = kmem_cache_alloc(cachep, GFP_KERNEL);
 	if (meta_group_info[i] == NULL) {
-		ext4_msg(sb, KERN_ERR, "EXT4-fs: can't allocate buddy mem");
+		printk(KERN_ERR "EXT4-fs: can't allocate buddy mem\n");
 		goto exit_group_info;
 	}
 	memset(meta_group_info[i], 0, kmem_cache_size(cachep));
@@ -2342,12 +2341,12 @@ static int ext4_mb_init_backend(struct super_block *sb)
 	 * So a two level scheme suffices for now. */
 	sbi->s_group_info = ext4_kvzalloc(array_size, GFP_KERNEL);
 	if (sbi->s_group_info == NULL) {
-		ext4_msg(sb, KERN_ERR, "can't allocate buddy meta group");
+		printk(KERN_ERR "EXT4-fs: can't allocate buddy meta group\n");
 		return -ENOMEM;
 	}
 	sbi->s_buddy_cache = new_inode(sb);
 	if (sbi->s_buddy_cache == NULL) {
-		ext4_msg(sb, KERN_ERR, "can't get new inode");
+		printk(KERN_ERR "EXT4-fs: can't get new inode\n");
 		goto err_freesgi;
 	}
 	sbi->s_buddy_cache->i_ino = get_next_ino();
@@ -2355,7 +2354,8 @@ static int ext4_mb_init_backend(struct super_block *sb)
 	for (i = 0; i < ngroups; i++) {
 		desc = ext4_get_group_desc(sb, i, NULL);
 		if (desc == NULL) {
-			ext4_msg(sb, KERN_ERR, "can't read descriptor %u", i);
+			printk(KERN_ERR
+				"EXT4-fs: can't read descriptor %u\n", i);
 			goto err_freebuddy;
 		}
 		if (ext4_mb_add_groupinfo(sb, i, desc) != 0)
@@ -2417,8 +2417,7 @@ static int ext4_groupinfo_create_slab(size_t size)
 
 	mutex_unlock(&ext4_grpinfo_slab_create_mutex);
 	if (!cachep) {
-		printk(KERN_EMERG
-		       "EXT4-fs: no memory for groupinfo slab cache\n");
+		printk(KERN_EMERG "EXT4: no memory for groupinfo slab cache\n");
 		return -ENOMEM;
 	}
 
@@ -2566,25 +2565,25 @@ int ext4_mb_release(struct super_block *sb)
 	if (sbi->s_buddy_cache)
 		iput(sbi->s_buddy_cache);
 	if (sbi->s_mb_stats) {
-		ext4_msg(sb, KERN_INFO,
-		       "mballoc: %u blocks %u reqs (%u success)",
+		printk(KERN_INFO
+		       "EXT4-fs: mballoc: %u blocks %u reqs (%u success)\n",
 				atomic_read(&sbi->s_bal_allocated),
 				atomic_read(&sbi->s_bal_reqs),
 				atomic_read(&sbi->s_bal_success));
-		ext4_msg(sb, KERN_INFO,
-		      "mballoc: %u extents scanned, %u goal hits, "
-				"%u 2^N hits, %u breaks, %u lost",
+		printk(KERN_INFO
+		      "EXT4-fs: mballoc: %u extents scanned, %u goal hits, "
+				"%u 2^N hits, %u breaks, %u lost\n",
 				atomic_read(&sbi->s_bal_ex_scanned),
 				atomic_read(&sbi->s_bal_goals),
 				atomic_read(&sbi->s_bal_2orders),
 				atomic_read(&sbi->s_bal_breaks),
 				atomic_read(&sbi->s_mb_lost_chunks));
-		ext4_msg(sb, KERN_INFO,
-		       "mballoc: %lu generated and it took %Lu",
-				sbi->s_mb_buddies_generated,
+		printk(KERN_INFO
+		       "EXT4-fs: mballoc: %lu generated and it took %Lu\n",
+				sbi->s_mb_buddies_generated++,
 				sbi->s_mb_generation_time);
-		ext4_msg(sb, KERN_INFO,
-		       "mballoc: %u preallocated, %u discarded",
+		printk(KERN_INFO
+		       "EXT4-fs: mballoc: %u preallocated, %u discarded\n",
 				atomic_read(&sbi->s_mb_preallocated),
 				atomic_read(&sbi->s_mb_discarded));
 	}
@@ -3015,10 +3014,9 @@ ext4_mb_normalize_request(struct ext4_allocation_context *ac,
 
 	if (start + size <= ac->ac_o_ex.fe_logical &&
 			start > ac->ac_o_ex.fe_logical) {
-		ext4_msg(ac->ac_sb, KERN_ERR,
-			 "start %lu, size %lu, fe_logical %lu",
-			 (unsigned long) start, (unsigned long) size,
-			 (unsigned long) ac->ac_o_ex.fe_logical);
+		printk(KERN_ERR "start %lu, size %lu, fe_logical %lu\n",
+			(unsigned long) start, (unsigned long) size,
+			(unsigned long) ac->ac_o_ex.fe_logical);
 	}
 	BUG_ON(start + size <= ac->ac_o_ex.fe_logical &&
 			start > ac->ac_o_ex.fe_logical);
@@ -3599,11 +3597,10 @@ ext4_mb_release_inode_pa(struct ext4_buddy *e4b, struct buffer_head *bitmap_bh,
 		bit = next + 1;
 	}
 	if (free != pa->pa_free) {
-		ext4_msg(e4b->bd_sb, KERN_CRIT,
-			 "pa %p: logic %lu, phys. %lu, len %lu",
-			 pa, (unsigned long) pa->pa_lstart,
-			 (unsigned long) pa->pa_pstart,
-			 (unsigned long) pa->pa_len);
+		printk(KERN_CRIT "pa %p: logic %lu, phys. %lu, len %lu\n",
+			pa, (unsigned long) pa->pa_lstart,
+			(unsigned long) pa->pa_pstart,
+			(unsigned long) pa->pa_len);
 		ext4_grp_locked_error(sb, group, 0, 0, "free %u, pa_free %u",
 					free, pa->pa_free);
 		/*
@@ -3791,8 +3788,7 @@ repeat:
 			 * use preallocation while we're discarding it */
 			spin_unlock(&pa->pa_lock);
 			spin_unlock(&ei->i_prealloc_lock);
-			ext4_msg(sb, KERN_ERR,
-				 "uh-oh! used pa while discarding");
+			printk(KERN_ERR "uh-oh! used pa while discarding\n");
 			WARN_ON(1);
 			schedule_timeout_uninterruptible(HZ);
 			goto repeat;
@@ -3869,13 +3865,12 @@ static void ext4_mb_show_ac(struct ext4_allocation_context *ac)
 	    (EXT4_SB(sb)->s_mount_flags & EXT4_MF_FS_ABORTED))
 		return;
 
-	ext4_msg(ac->ac_sb, KERN_ERR, "EXT4-fs: Can't allocate:"
-			" Allocation context details:");
-	ext4_msg(ac->ac_sb, KERN_ERR, "EXT4-fs: status %d flags %d",
+	printk(KERN_ERR "EXT4-fs: Can't allocate:"
+			" Allocation context details:\n");
+	printk(KERN_ERR "EXT4-fs: status %d flags %d\n",
 			ac->ac_status, ac->ac_flags);
-	ext4_msg(ac->ac_sb, KERN_ERR, "EXT4-fs: orig %lu/%lu/%lu@%lu, "
-		 	"goal %lu/%lu/%lu@%lu, "
-			"best %lu/%lu/%lu@%lu cr %d",
+	printk(KERN_ERR "EXT4-fs: orig %lu/%lu/%lu@%lu, goal %lu/%lu/%lu@%lu, "
+			"best %lu/%lu/%lu@%lu cr %d\n",
 			(unsigned long)ac->ac_o_ex.fe_group,
 			(unsigned long)ac->ac_o_ex.fe_start,
 			(unsigned long)ac->ac_o_ex.fe_len,
@@ -3889,9 +3884,9 @@ static void ext4_mb_show_ac(struct ext4_allocation_context *ac)
 			(unsigned long)ac->ac_b_ex.fe_len,
 			(unsigned long)ac->ac_b_ex.fe_logical,
 			(int)ac->ac_criteria);
-	ext4_msg(ac->ac_sb, KERN_ERR, "EXT4-fs: %lu scanned, %d found",
-		 ac->ac_ex_scanned, ac->ac_found);
-	ext4_msg(ac->ac_sb, KERN_ERR, "EXT4-fs: groups: ");
+	printk(KERN_ERR "EXT4-fs: %lu scanned, %d found\n", ac->ac_ex_scanned,
+		ac->ac_found);
+	printk(KERN_ERR "EXT4-fs: groups: \n");
 	ngroups = ext4_get_groups_count(sb);
 	for (i = 0; i < ngroups; i++) {
 		struct ext4_group_info *grp = ext4_get_group_info(sb, i);
