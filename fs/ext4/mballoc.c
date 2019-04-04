@@ -4666,7 +4666,7 @@ error_return:
  *
  * This marks the blocks as free in the bitmap and buddy.
  */
-int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
+void ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 			 ext4_fsblk_t block, unsigned long count)
 {
 	struct buffer_head *bitmap_bh = NULL;
@@ -4689,24 +4689,15 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 	 * Check to see if we are freeing blocks across a group
 	 * boundary.
 	 */
-	if (bit + count > EXT4_BLOCKS_PER_GROUP(sb)) {
-		ext4_warning(sb, "too much blocks added to group %u\n",
-			     block_group);
-		err = -EINVAL;
+	if (bit + count > EXT4_BLOCKS_PER_GROUP(sb))
 		goto error_return;
-	}
 
 	bitmap_bh = ext4_read_block_bitmap(sb, block_group);
-	if (!bitmap_bh) {
-		err = -EIO;
+	if (!bitmap_bh)
 		goto error_return;
-	}
-
 	desc = ext4_get_group_desc(sb, block_group, &gd_bh);
-	if (!desc) {
-		err = -EIO;
+	if (!desc)
 		goto error_return;
-	}
 
 	if (in_range(ext4_block_bitmap(sb, desc), block, count) ||
 	    in_range(ext4_inode_bitmap(sb, desc), block, count) ||
@@ -4716,7 +4707,6 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 		ext4_error(sb, "Adding blocks in system zones - "
 			   "Block = %llu, count = %lu",
 			   block, count);
-		err = -EINVAL;
 		goto error_return;
 	}
 
@@ -4785,7 +4775,7 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 error_return:
 	brelse(bitmap_bh);
 	ext4_std_error(sb, err);
-	return err;
+	return;
 }
 
 /**
