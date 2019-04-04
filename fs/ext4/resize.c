@@ -467,13 +467,12 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	if (unlikely(err))
 		goto exit_dindj;
 
-	n_group_desc = ext4_kvmalloc((gdb_num + 1) *
-				     sizeof(struct buffer_head *),
-				     GFP_NOFS);
+	n_group_desc = kmalloc((gdb_num + 1) * sizeof(struct buffer_head *),
+			GFP_NOFS);
 	if (!n_group_desc) {
 		err = -ENOMEM;
-		ext4_warning(sb, "not enough memory for %lu groups",
-			     gdb_num + 1);
+		ext4_warning(sb,
+			      "not enough memory for %lu groups", gdb_num + 1);
 		goto exit_inode;
 	}
 
@@ -508,7 +507,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	n_group_desc[gdb_num] = gdb_bh;
 	EXT4_SB(sb)->s_group_desc = n_group_desc;
 	EXT4_SB(sb)->s_gdb_count++;
-	ext4_kvfree(o_group_desc);
+	kfree(o_group_desc);
 
 	le16_add_cpu(&es->s_reserved_gdt_blocks, -1);
 	err = ext4_handle_dirty_metadata(handle, NULL, EXT4_SB(sb)->s_sbh);
@@ -518,7 +517,7 @@ static int add_new_gdb(handle_t *handle, struct inode *inode,
 	return err;
 
 exit_inode:
-	ext4_kvfree(n_group_desc);
+	kfree(n_group_desc);
 	/* ext4_handle_release_buffer(handle, iloc.bh); */
 	brelse(iloc.bh);
 exit_dindj:
