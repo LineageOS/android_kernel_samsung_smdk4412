@@ -217,6 +217,11 @@ static int setup_new_group_blocks(struct super_block *sb,
 		goto exit_journal;
 	}
 
+	if (ext4_bg_has_super(sb, input->group)) {
+		ext4_debug("mark backup superblock %#04llx (+0)\n", start);
+		ext4_set_bit(0, bh->b_data);
+	}
+
 	/* Copy all of the GDT blocks into the backup in this group */
 	for (i = 0, bit = 1, block = start + 1;
 	     i < gdblocks; i++, block++, bit++) {
@@ -245,6 +250,7 @@ static int setup_new_group_blocks(struct super_block *sb,
 			brelse(gdb);
 			goto exit_bh;
 		}
+		ext4_set_bit(bit, bh->b_data);
 		brelse(gdb);
 	}
 
@@ -255,11 +261,8 @@ static int setup_new_group_blocks(struct super_block *sb,
 			       GFP_NOFS);
 	if (err)
 		goto exit_bh;
-
-	if (ext4_bg_has_super(sb, input->group)) {
-		ext4_debug("mark backup group tables %#04llx (+0)\n", start);
-		ext4_set_bits(bh->b_data, 0, gdblocks + reserved_gdb + 1);
-	}
+	for (i = 0, bit = gdblocks + 1; i < reserved_gdb; i++, bit++)
+		ext4_set_bit(bit, bh->b_data);
 
 	ext4_debug("mark block bitmap %#04llx (+%llu)\n", input->block_bitmap,
 		   input->block_bitmap - start);
@@ -275,8 +278,9 @@ static int setup_new_group_blocks(struct super_block *sb,
 	err = sb_issue_zeroout(sb, block, sbi->s_itb_per_group, GFP_NOFS);
 	if (err)
 		goto exit_bh;
-	ext4_set_bits(bh->b_data, input->inode_table - start,
-		      sbi->s_itb_per_group);
+	for (i = 0, bit = input->inode_table - start;
+	     i < sbi->s_itb_per_group; i++, bit++)
+		ext4_set_bit(bit, bh->b_data);
 
 	if ((err = extend_or_restart_transaction(handle, 2, bh)))
 		goto exit_bh;
