@@ -518,6 +518,13 @@ config VIDEO_M5MO
         ---help---
           This driver supports M5MO SoC camera module
 
+config VIDEO_M5MO_WAKELOCK
+	bool "M5MO flash wake lock support"
+	depends on VIDEO_M5MO
+	---help---
+	  Enable wake lock support for camera M5MO rear flash.
+	  If unsure, say Y.
+
 config VIDEO_M9MO
         tristate "M9MO supporting camera driver"
 	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
