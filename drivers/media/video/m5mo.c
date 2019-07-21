@@ -952,6 +952,7 @@ retry:
 		if (m5mo_wakelock_active) {
 			cam_dbg("%s: FLASH_MODE_OFF: release wakelock\n", __func__);
 			pm_wake_unlock("flash");
+			m5mo_wakelock_active = false;
 		}
 #endif
 		light = 0x00;
@@ -973,6 +974,7 @@ retry:
 		if (!m5mo_wakelock_active) {
 			cam_dbg("%s: FLASH_MODE_TORCH: acquire wakelock\n", __func__);
 			pm_wake_lock("flash");
+			m5mo_wakelock_active = true;
 		}
 #endif
 		light = 0x03;
