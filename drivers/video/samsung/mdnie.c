@@ -201,7 +201,7 @@ static struct mdnie_tuning_info *mdnie_request_table(struct mdnie_info *mdnie)
 		table = &color_tone_table[mdnie->scenario % COLOR_TONE_1];
 		goto exit;
 	} else if (mdnie->scenario < SCENARIO_MAX) {
-		table = &tuning_table[mdnie->cabc][mdnie->mode][mdnie->scenario];
+		table = &tuning_table[mdnie->cabc][mdnie->mode][mdnie->outdoor][mdnie->scenario];
 		goto exit;
 	}
 
@@ -385,7 +385,7 @@ static const struct backlight_ops mdnie_backlight_ops  = {
 #if !defined(CONFIG_FB_MDNIE_PWM)
 static void update_color_position(struct mdnie_info *mdnie, u16 idx)
 {
-	u8 cabc, mode, scenario, i;
+	u8 cabc, mode, scenario, i, outdoor;
 	unsigned short *wbuf;
 
 	dev_info(mdnie->dev, "%s: idx=%d\n", __func__, idx);
@@ -394,22 +394,24 @@ static void update_color_position(struct mdnie_info *mdnie, u16 idx)
 
 	for (cabc = 0; cabc < CABC_MAX; cabc++) {
 		for (mode = 0; mode < MODE_MAX; mode++) {
-			for (scenario = 0; scenario < SCENARIO_MAX; scenario++) {
-				wbuf = tuning_table[cabc][mode][scenario].sequence;
-				if (IS_ERR_OR_NULL(wbuf))
-					continue;
-				i = 0;
-				while (wbuf[i] != END_SEQ) {
-					if (ADDRESS_IS_SCR_WHITE(wbuf[i]))
-						break;
-					i += 2;
-				}
-				if ((wbuf[i] == END_SEQ) || IS_ERR_OR_NULL(&wbuf[i+5]))
-					continue;
-				if ((wbuf[i+1] == 0xff) && (wbuf[i+3] == 0xff) && (wbuf[i+5] == 0xff)) {
-					wbuf[i+1] = tune_scr_setting[idx][0];
-					wbuf[i+3] = tune_scr_setting[idx][1];
-					wbuf[i+5] = tune_scr_setting[idx][2];
+			for (outdoor = 0; outdoor < OUTDOOR_MAX; outdoor++) {
+				for (scenario = 0; scenario < SCENARIO_MAX; scenario++) {
+					wbuf = tuning_table[cabc][mode][outdoor][scenario].sequence;
+					if (IS_ERR_OR_NULL(wbuf))
+						continue;
+					i = 0;
+					while (wbuf[i] != END_SEQ) {
+						if (ADDRESS_IS_SCR_WHITE(wbuf[i]))
+							break;
+						i += 2;
+					}
+					if ((wbuf[i] == END_SEQ) || IS_ERR_OR_NULL(&wbuf[i+5]))
+						continue;
+					if ((wbuf[i+1] == 0xff) && (wbuf[i+3] == 0xff) && (wbuf[i+5] == 0xff)) {
+						wbuf[i+1] = tune_scr_setting[idx][0];
+						wbuf[i+3] = tune_scr_setting[idx][1];
+						wbuf[i+5] = tune_scr_setting[idx][2];
+					}
 				}
 			}
 		}
@@ -577,6 +579,39 @@ static ssize_t scenario_store(struct device *dev,
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
 #endif
+
+	return count;
+}
+
+static ssize_t outdoor_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", mdnie->outdoor);
+}
+
+static ssize_t outdoor_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	unsigned int value;
+	int ret;
+
+	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
+
+	dev_info(dev, "%s :: value=%d\n", __func__, value);
+
+	if (value >= OUTDOOR_MAX)
+		value = OUTDOOR_OFF;
+
+	value = (value) ? OUTDOOR_ON : OUTDOOR_OFF;
+
+	mutex_lock(&mdnie->lock);
+	mdnie->outdoor = value;
+	mutex_unlock(&mdnie->lock);
+
+	mdnie_update(mdnie);
 
 	return count;
 }
@@ -953,6 +988,7 @@ static struct device_attribute mdnie_attributes[] = {
 	__ATTR(mode, 0664, mode_show, mode_store),
 	__ATTR(mode_max, 0664, mode_max_show, NULL),
 	__ATTR(scenario, 0664, scenario_show, scenario_store),
+	__ATTR(outdoor, 0664, outdoor_show, outdoor_store),
 #if defined(CONFIG_FB_MDNIE_PWM)
 	__ATTR(cabc, 0664, cabc_show, cabc_store),
 #endif

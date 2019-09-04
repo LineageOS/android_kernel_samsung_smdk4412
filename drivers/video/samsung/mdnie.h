@@ -45,6 +45,11 @@ enum SCENARIO_DMB {
 	DMB_MODE_MAX
 };
 
+enum OUTDOOR {
+	OUTDOOR_OFF,
+	OUTDOOR_ON,
+	OUTDOOR_MAX,
+};
 enum CABC {
 	CABC_OFF,
 #if defined(CONFIG_FB_MDNIE_PWM)
@@ -101,6 +106,7 @@ struct mdnie_info {
 	unsigned int enable;
 	enum SCENARIO scenario;
 	enum MODE mode;
+	enum OUTDOOR outdoor;
 	enum CABC cabc;
 	unsigned int tuning;
 	unsigned int accessibility;
