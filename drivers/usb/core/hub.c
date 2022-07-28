@@ -2398,6 +2398,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	 * NOTE:  OTG devices may issue remote wakeup (or SRP) even when
 	 * we don't explicitly enable it here.
 	 */
+#if !defined(CONFIG_MACH_C1_KOR_SKT) && !defined(CONFIG_MACH_C1_KOR_KT) && !defined(CONFIG_MACH_C1_KOR_LGT)
 	if (udev->do_remote_wakeup) {
 		status = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 				USB_REQ_SET_FEATURE, USB_RECIP_DEVICE,
@@ -2412,6 +2413,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 				return status;
 		}
 	}
+#endif
 
 	/* see 7.1.7.6 */
 	if (hub_is_superspeed(hub->hdev))
@@ -2425,12 +2427,14 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 		dev_dbg(hub->intfdev, "can't suspend port %d, status %d\n",
 				port1, status);
 		/* paranoia:  "should not happen" */
+#if !defined(CONFIG_MACH_C1_KOR_SKT) && !defined(CONFIG_MACH_C1_KOR_KT) && !defined(CONFIG_MACH_C1_KOR_LGT)
 		if (udev->do_remote_wakeup)
 			(void) usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 				USB_REQ_CLEAR_FEATURE, USB_RECIP_DEVICE,
 				USB_DEVICE_REMOTE_WAKEUP, 0,
 				NULL, 0,
 				USB_CTRL_SET_TIMEOUT);
+#endif
 
 		/* System sleep transitions should never fail */
 		if (!(msg.event & PM_EVENT_AUTO))

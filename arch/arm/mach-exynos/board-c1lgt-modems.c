@@ -25,7 +25,7 @@
 
 /* inlcude platform specific file */
 #include <linux/cpufreq_pegasusq.h>
-#include <linux/platform_data/modem.h>
+#include <linux/platform_data/modem_c1.h>
 
 #include <plat/gpio-cfg.h>
 #include <plat/regs-srom.h>
@@ -48,6 +48,10 @@
 #endif
 
 static int __init init_modem(void);
+static void setup_dpram_access_timing(enum dpram_speed speed);
+static int host_port_enable(int port, int enable);
+static int exynos_frequency_lock(struct device *dev);
+static int exynos_frequency_unlock(struct device *dev);
 
 static struct modem_io_t umts_io_devices[] = {
 	[0] = {
@@ -56,6 +60,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_BOOT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "CBD"
 	},
 	[1] = {
 		.name = "umts_ipc0",
@@ -63,6 +68,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "RIL"
 	},
 	[2] = {
 		.name = "umts_rfs0",
@@ -70,6 +76,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "RFS"
 	},
 	[3] = {
 		.name = "multipdp",
@@ -124,6 +131,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "Data Router"
 	},
 	[10] = {
 		.name = "umts_dm0",	/* DM Port */
@@ -131,6 +139,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "DIAG"
 	},
 	[11] = {
 		.name = "umts_loopback_cp2ap",
@@ -139,6 +148,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM) | LINKTYPE(LINKDEV_USB),
 		.tx_link = LINKDEV_DPRAM,
+		.app = "CP Loopback"
 	},
 	[12] = {
 		.name = "umts_loopback_ap2cp",
@@ -146,6 +156,7 @@ static struct modem_io_t umts_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "AP loopback"
 	},
 	[13] = {
 		.name = "umts_ramdump0",
@@ -177,6 +188,7 @@ static struct modem_io_t cdma_io_devices[] = {
 		.format = IPC_BOOT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "CBD"
 	},
 	[1] = {
 		.name = "cdma_ipc0",
@@ -184,6 +196,7 @@ static struct modem_io_t cdma_io_devices[] = {
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "RIL"
 	},
 	[2] = {
 		.name = "cdma_rfs0",
@@ -191,6 +204,7 @@ static struct modem_io_t cdma_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "RFS"
 	},
 	[3] = {
 		.name = "cdma_multipdp",
@@ -261,6 +275,7 @@ static struct modem_io_t cdma_io_devices[] = {
 		.format = IPC_RAW,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
+		.app = "DIAG"
 	},
 };
 
@@ -277,39 +292,11 @@ static struct sromc_bus_cfg c1lgt_sromc_bus_cfg = {
 };
 
 /* For CMC221 IDPRAM (Internal DPRAM) */
+#define CMC_IDPRAM_BASE		SROM_CS0_BASE
 #define CMC_IDPRAM_SIZE		DPRAM_SIZE_16KB
 
-/* For CMC221 SFR for IDPRAM */
-#define CMC_INT2CP_REG		0x10	/* Interrupt to CP            */
-#define CMC_INT2AP_REG		0x50
-#define CMC_CLR_INT_REG		0x28	/* Clear Interrupt to AP      */
-#define CMC_RESET_REG		0x3C
-#define CMC_PUT_REG		0x40	/* AP->CP reg for hostbooting */
-#define CMC_GET_REG		0x50	/* CP->AP reg for hostbooting */
-
-struct cmc22x_idpram_sfr {
-	u16 __iomem *int2cp;
-	u16 __iomem *int2ap;
-	u16 __iomem *clr_int2ap;
-	u16 __iomem *reset;
-	u16 __iomem *msg2cp;
-	u16 __iomem *msg2ap;
-};
-
-/*
-** Function prototypes for CMC221
-*/
-static void cmc_idpram_reset(void);
-static void cmc_idpram_clr_intr(void);
-static u16 cmc_idpram_recv_intr(void);
-static void cmc_idpram_send_intr(u16 irq_mask);
-static u16 cmc_idpram_recv_msg(void);
-static void cmc_idpram_send_msg(u16 msg);
-
-static int cmc_idpram_wakeup(void);
-static void cmc_idpram_sleep(void);
-
-static void cmc_idpram_setup_speed(enum dpram_speed speed);
+#define CMC_IDPRAM_SFR_BASE	(CMC_IDPRAM_BASE + CMC_IDPRAM_SIZE)
+#define CMC_IDPRAM_SFR_SIZE	DPRAM_SIZE_16KB
 
 /*
 ** Static variables for CMC221
@@ -317,36 +304,34 @@ static void cmc_idpram_setup_speed(enum dpram_speed speed);
 static struct sromc_bank_cfg cmc_idpram_bank_cfg = {
 	.csn = 0,
 	.attr = SROMC_DATA_16,
-	.size = CMC_IDPRAM_SIZE,
-	.addr = SROM_CS0_BASE,
 };
 
 static struct sromc_timing_cfg cmc_idpram_timing_cfg[] = {
 	[DPRAM_SPEED_LOW] = {
-		/* CP 33 MHz clk, 315 ns (63 cycles) with 200 MHz INT clk */
+		/* CP 33 MHz clk, 360 ns (72 cycles) with 200 MHz INT clk */
 		.tacs = 0x0F << 28,
 		.tcos = 0x0F << 24,
+		.tacc = 0x1F << 16,
+		.tcoh = 0x0A << 12,
+		.tcah = 0x00 << 8,
+		.tacp = 0x00 << 4,
+		.pmc  = 0x00 << 0,
+	},
+	[DPRAM_SPEED_MID] = {
+		/* CP 66 MHz clk, 180 ns (36 cycles) with 200 MHz INT clk */
+		.tacs = 0x01 << 28,
+		.tcos = 0x02 << 24,
 		.tacc = 0x1F << 16,
 		.tcoh = 0x01 << 12,
 		.tcah = 0x00 << 8,
 		.tacp = 0x00 << 4,
 		.pmc  = 0x00 << 0,
 	},
-	[DPRAM_SPEED_MID] = {
-		/* CP 66 MHz clk, 160 ns (32 cycles) with 200 MHz INT clk */
-		.tacs = 0x01 << 28,
-		.tcos = 0x01 << 24,
-		.tacc = 0x1C << 16,
-		.tcoh = 0x01 << 12,
-		.tcah = 0x00 << 8,
-		.tacp = 0x00 << 4,
-		.pmc  = 0x00 << 0,
-	},
 	[DPRAM_SPEED_HIGH] = {
-		/* CP 133 MHz clk, 80 ns (16 cycles) with 200 MHz INT clk */
+		/* CP 133 MHz clk, 90 ns (18 cycles) with 200 MHz INT clk */
 		.tacs = 0x01 << 28,
 		.tcos = 0x01 << 24,
-		.tacc = 0x0C << 16,
+		.tacc = 0x0E << 16,
 		.tcoh = 0x01 << 12,
 		.tcah = 0x00 << 8,
 		.tacp = 0x00 << 4,
@@ -355,43 +340,35 @@ static struct sromc_timing_cfg cmc_idpram_timing_cfg[] = {
 };
 
 static struct modemlink_dpram_control cmc_idpram_ctrl = {
-	.reset = cmc_idpram_reset,
-	.clear_intr = cmc_idpram_clr_intr,
-	.recv_intr = cmc_idpram_recv_intr,
-	.send_intr = cmc_idpram_send_intr,
-	.recv_msg = cmc_idpram_recv_msg,
-	.send_msg = cmc_idpram_send_msg,
-
-	.wakeup = cmc_idpram_wakeup,
-	.sleep = cmc_idpram_sleep,
-
-	.setup_speed = cmc_idpram_setup_speed,
-
 	.dp_type = CP_IDPRAM,
-
 	.dpram_irq_flags = (IRQF_NO_SUSPEND | IRQF_TRIGGER_RISING),
+	.setup_speed = setup_dpram_access_timing,
 };
-
-static struct cmc22x_idpram_sfr cmc_idpram_sfr;
 
 static struct resource umts_modem_res[] = {
 	[RES_CP_ACTIVE_IRQ_ID] = {
-		.name = "cp_active_irq",
+		.name = STR_CP_ACTIVE_IRQ,
 		.start = LTE_ACTIVE_IRQ,
 		.end = LTE_ACTIVE_IRQ,
 		.flags = IORESOURCE_IRQ,
 	},
 	[RES_DPRAM_MEM_ID] = {
-		.name = "dpram_base",
-		.start = SROM_CS0_BASE,
-		.end = SROM_CS0_BASE + (CMC_IDPRAM_SIZE - 1),
+		.name = STR_DPRAM_BASE,
+		.start = CMC_IDPRAM_BASE,
+		.end = CMC_IDPRAM_BASE + (CMC_IDPRAM_SIZE - 1),
 		.flags = IORESOURCE_MEM,
 	},
 	[RES_DPRAM_IRQ_ID] = {
-		.name = "dpram_irq",
+		.name = STR_DPRAM_IRQ,
 		.start = CMC_IDPRAM_INT_IRQ_01,
 		.end = CMC_IDPRAM_INT_IRQ_01,
 		.flags = IORESOURCE_IRQ,
+	},
+	[RES_DPRAM_SFR_ID] = {
+		.name = STR_DPRAM_SFR_BASE,
+		.start = CMC_IDPRAM_SFR_BASE,
+		.end = CMC_IDPRAM_SFR_BASE + (CMC_IDPRAM_SIZE - 1),
+		.flags = IORESOURCE_MEM,
 	},
 };
 
@@ -401,9 +378,7 @@ static struct modem_data umts_modem_data = {
 	.gpio_cp_on = CP_CMC221_PMIC_PWRON,
 	.gpio_cp_reset = CP_CMC221_CPU_RST,
 	.gpio_phone_active = GPIO_LTE_ACTIVE,
-#if 1
 	.gpio_pda_active   = GPIO_PDA_ACTIVE,
-#endif
 
 	.gpio_dpram_int = GPIO_CMC_IDPRAM_INT_01,
 	.gpio_dpram_status = GPIO_CMC_IDPRAM_STATUS,
@@ -413,6 +388,10 @@ static struct modem_data umts_modem_data = {
 	.gpio_host_active = GPIO_ACTIVE_STATE,
 	.gpio_host_wakeup = GPIO_IPC_HOST_WAKEUP,
 	.gpio_dynamic_switching = GPIO_AP2CMC_INT2,
+
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	.gpio_cpufreq_lock = GPIO_CMC_SPI_CLK_REQ,
+#endif
 
 	.modem_net = UMTS_NETWORK,
 	.modem_type = SEC_CMC221,
@@ -442,128 +421,32 @@ static struct platform_device umts_modem = {
 /*
 ** Function definitions
 */
-static void cmc_idpram_reset(void)
-{
-	iowrite16(1, cmc_idpram_sfr.reset);
-}
-
-static void cmc_idpram_clr_intr(void)
-{
-	iowrite16(0xFFFF, cmc_idpram_sfr.clr_int2ap);
-	iowrite16(0, cmc_idpram_sfr.int2ap);
-}
-
-static u16 cmc_idpram_recv_intr(void)
-{
-	return ioread16(cmc_idpram_sfr.int2ap);
-}
-
-static void cmc_idpram_send_intr(u16 irq_mask)
-{
-	iowrite16(irq_mask, cmc_idpram_sfr.int2cp);
-}
-
-static u16 cmc_idpram_recv_msg(void)
-{
-	return ioread16(cmc_idpram_sfr.msg2ap);
-}
-
-static void cmc_idpram_send_msg(u16 msg)
-{
-	iowrite16(msg, cmc_idpram_sfr.msg2cp);
-}
-
-static int cmc_idpram_wakeup(void)
-{
-	int cnt = 0;
-
-	gpio_set_value(umts_modem_data.gpio_dpram_wakeup, 1);
-
-	while (!gpio_get_value(umts_modem_data.gpio_dpram_status)) {
-		if (cnt++ > 10) {
-			if (in_irq())
-				mif_err("ERR! gpio_dpram_status == 0 in IRQ\n");
-			else
-				mif_err("ERR! gpio_dpram_status == 0\n");
-			return -EACCES;
-		}
-
-		mif_info("gpio_dpram_status == 0 (cnt %d)\n", cnt);
-		if (in_interrupt())
-			udelay(1000);
-		else
-			usleep_range(1000, 2000);
-	}
-
-	return 0;
-}
-
-static void cmc_idpram_sleep(void)
-{
-	gpio_set_value(umts_modem_data.gpio_dpram_wakeup, 0);
-}
-
-static void cmc_idpram_setup_speed(enum dpram_speed speed)
-{
-	sromc_config_access_timing(cmc_idpram_bank_cfg.csn,
-				&cmc_idpram_timing_cfg[speed]);
-}
-
-static u8 *cmc_idpram_remap_sfr_region(struct sromc_bank_cfg *cfg)
-{
-	int dp_addr = cfg->addr + cfg->size;
-	int dp_size = cfg->size;
-	u8 __iomem *sfr_base;
-
-	/* Remap DPRAM SFR region */
-	sfr_base = (u8 __iomem *)ioremap_nocache(dp_addr, dp_size);
-	if (!sfr_base) {
-		mif_err("ERR: ioremap_nocache fail\n");
-		return NULL;
-	}
-
-	cmc_idpram_sfr.int2cp = (u16 __iomem *)(sfr_base + CMC_INT2CP_REG);
-	cmc_idpram_sfr.int2ap = (u16 __iomem *)(sfr_base + CMC_INT2AP_REG);
-	cmc_idpram_sfr.clr_int2ap = (u16 __iomem *)(sfr_base + CMC_CLR_INT_REG);
-	cmc_idpram_sfr.reset = (u16 __iomem *)(sfr_base + CMC_RESET_REG);
-	cmc_idpram_sfr.msg2cp = (u16 __iomem *)(sfr_base + CMC_PUT_REG);
-	cmc_idpram_sfr.msg2ap = (u16 __iomem *)(sfr_base + CMC_GET_REG);
-
-	return sfr_base;
-}
-
-/* Set dynamic environment for a modem */
 static void setup_umts_modem_env(void)
 {
-	unsigned int addr;
-	unsigned int end;
-
 	/* Config DPRAM control structure */
-	if (system_rev == 1 || system_rev >= 4) {
-		cmc_idpram_bank_cfg.csn = 0;
-		cmc_idpram_bank_cfg.addr = SROM_CS0_BASE;
-	} else {
+#if !defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+	if (system_rev != 1 && system_rev < 4) {
+		unsigned int addr;
+		unsigned int end;
+
 		cmc_idpram_bank_cfg.csn = 1;
-		cmc_idpram_bank_cfg.addr = SROM_CS1_BASE;
-	}
 
-	addr = cmc_idpram_bank_cfg.addr;
-	end = addr + cmc_idpram_bank_cfg.size - 1;
-	umts_modem_res[RES_DPRAM_MEM_ID].start = addr;
-	umts_modem_res[RES_DPRAM_MEM_ID].end = end;
+		addr = SROM_CS1_BASE;
+		end = addr + CMC_IDPRAM_SIZE - 1;
+		umts_modem_res[RES_DPRAM_MEM_ID].start = addr;
+		umts_modem_res[RES_DPRAM_MEM_ID].end = end;
 
-	if (system_rev == 1 || system_rev >= 4) {
-		umts_modem_res[RES_DPRAM_IRQ_ID].start = CMC_IDPRAM_INT_IRQ_01;
-		umts_modem_res[RES_DPRAM_IRQ_ID].end = CMC_IDPRAM_INT_IRQ_01;
-	} else {
+		addr = SROM_CS1_BASE + CMC_IDPRAM_SIZE;
+		end = addr + CMC_IDPRAM_SIZE - 1;
+		umts_modem_res[RES_DPRAM_SFR_ID].start = addr;
+		umts_modem_res[RES_DPRAM_SFR_ID].end = end;
+
 		umts_modem_res[RES_DPRAM_IRQ_ID].start = CMC_IDPRAM_INT_IRQ_00;
 		umts_modem_res[RES_DPRAM_IRQ_ID].end = CMC_IDPRAM_INT_IRQ_00;
-	}
 
-	if (system_rev == 1 || system_rev >= 4)
-		umts_modem_data.gpio_dpram_int = GPIO_CMC_IDPRAM_INT_01;
-	else
 		umts_modem_data.gpio_dpram_int = GPIO_CMC_IDPRAM_INT_00;
+	}
+#endif
 }
 
 static void config_umts_modem_gpio(void)
@@ -581,6 +464,9 @@ static void config_umts_modem_gpio(void)
 	unsigned gpio_dpram_wakeup = umts_modem_data.gpio_dpram_wakeup;
 	unsigned gpio_dynamic_switching =
 			umts_modem_data.gpio_dynamic_switching;
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	unsigned gpio_cpufreq_lock = umts_modem_data.gpio_cpufreq_lock;
+#endif
 
 	if (gpio_cp_on) {
 		err = gpio_request(gpio_cp_on, "CMC_ON");
@@ -706,12 +592,29 @@ static void config_umts_modem_gpio(void)
 		}
 	}
 
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	if (gpio_cpufreq_lock) {
+		err = gpio_request(gpio_cpufreq_lock, "CPUFREQ_LOCK_CNT");
+		if (err) {
+			mif_err("ERR: fail to request gpio %s\n",
+					"CPUFREQ_LOCK_CNT\n");
+		} else {
+			gpio_direction_input(gpio_cpufreq_lock);
+			s3c_gpio_setpull(gpio_cpufreq_lock,
+					S3C_GPIO_PULL_NONE);
+		}
+		s5p_register_gpio_interrupt(gpio_cpufreq_lock);
+	}
+#endif
+
 	mif_info("done\n");
 }
 
-static int host_port_enable(int port, int enable);
-static int exynos_frequency_lock(struct device *dev);
-static int exynos_frequency_unlock(struct device *dev);
+static void setup_dpram_access_timing(enum dpram_speed speed)
+{
+	sromc_config_access_timing(cmc_idpram_bank_cfg.csn,
+				&cmc_idpram_timing_cfg[speed]);
+}
 
 static struct modemlink_pm_data umts_link_pm_data = {
 	.name = "umts_link_pm",
@@ -725,9 +628,13 @@ static struct modemlink_pm_data umts_link_pm_data = {
 /*
 	.link_reconnect = umts_link_reconnect,
 */
-	.freqlock = ATOMIC_INIT(0),
+
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	.freq_usblock = ATOMIC_INIT(0),
+	.freq_dpramlock = ATOMIC_INIT(0),
 	.freq_lock = exynos_frequency_lock,
 	.freq_unlock = exynos_frequency_unlock,
+#endif
 
 	.autosuspend_delay_ms = 2000,
 
@@ -741,10 +648,24 @@ static int exynos_frequency_lock(struct device *dev)
 {
 	unsigned int level, cpufreq = 600; /* 200 ~ 1400 */
 	unsigned int busfreq = 400200; /* 100100 ~ 400200 */
-	int ret = 0;
+	int ret = 0, lock_id;
+	atomic_t *freqlock;
 	struct device *busdev = dev_get("exynos-busfreq");
 
-	if (atomic_read(&umts_link_pm_data.freqlock) == 0) {
+	if (!strcmp(dev->bus->name, "usb")) {
+		lock_id = DVFS_LOCK_ID_USB_IF;
+		cpufreq = 600;
+		freqlock = &umts_link_pm_data.freq_usblock;
+	} else if (!strcmp(dev->bus->name, "platform")) { // for dpram lock
+		lock_id = DVFS_LOCK_ID_DPRAM_IF;
+		cpufreq = 800;
+		freqlock = &umts_link_pm_data.freq_dpramlock;
+	} else {
+		mif_err("ERR: Unkown unlock ID (%s)\n", dev->bus->name);
+		goto exit;
+	}
+	
+	if (atomic_read(freqlock) == 0) {
 		/* cpu frequency lock */
 		ret = exynos_cpufreq_get_level(cpufreq * 1000, &level);
 		if (ret < 0) {
@@ -753,7 +674,7 @@ static int exynos_frequency_lock(struct device *dev)
 			goto exit;
 		}
 
-		ret = exynos_cpufreq_lock(DVFS_LOCK_ID_USB_IF, level);
+		ret = exynos_cpufreq_lock(lock_id, level);
 		if (ret < 0) {
 			mif_err("ERR: exynos_cpufreq_lock fail: %d\n", ret);
 			goto exit;
@@ -775,7 +696,7 @@ static int exynos_frequency_lock(struct device *dev)
 		/* lock minimum number of cpu cores */
 		cpufreq_pegasusq_min_cpu_lock(2);
 
-		atomic_set(&umts_link_pm_data.freqlock, 1);
+		atomic_set(freqlock, 1);
 		mif_debug("level=%d, cpufreq=%d MHz, busfreq=%06d\n",
 				level, cpufreq, busfreq);
 	}
@@ -785,12 +706,24 @@ exit:
 
 static int exynos_frequency_unlock(struct device *dev)
 {
-	int ret = 0;
+	int ret = 0, lock_id;
+	atomic_t *freqlock;
 	struct device *busdev = dev_get("exynos-busfreq");
 
-	if (atomic_read(&umts_link_pm_data.freqlock) == 1) {
+	if (!strcmp(dev->bus->name, "usb")) {
+		lock_id = DVFS_LOCK_ID_USB_IF;
+		freqlock = &umts_link_pm_data.freq_usblock;
+	} else if (!strcmp(dev->bus->name, "platform")) { // for dpram lock
+		lock_id = DVFS_LOCK_ID_DPRAM_IF;
+		freqlock = &umts_link_pm_data.freq_dpramlock;
+	} else {
+		mif_err("ERR: Unkown unlock ID (%s)\n", dev->bus->name);
+		goto exit;
+	}
+
+	if (atomic_read(freqlock) == 1) {
 		/* cpu frequency unlock */
-		exynos_cpufreq_lock_free(DVFS_LOCK_ID_USB_IF);
+		exynos_cpufreq_lock_free(lock_id);
 
 		/* bus frequency unlock */
 		ret = dev_unlock(busdev, dev);
@@ -802,7 +735,7 @@ static int exynos_frequency_unlock(struct device *dev)
 		/* unlock minimum number of cpu cores */
 		cpufreq_pegasusq_min_cpu_unlock();
 
-		atomic_set(&umts_link_pm_data.freqlock, 0);
+		atomic_set(freqlock, 0);
 		mif_debug("success\n");
 	}
 exit:
@@ -857,8 +790,8 @@ void set_hsic_lpa_states(int states)
 			break;
 		case STATE_HSIC_LPA_WAKE:
 			mif_info("lpa_wake\n");
-			gpio_set_value(umts_modem_data.gpio_host_active, 1);
-			mif_info("> H-ACT %d\n", 1);
+			if (!modem_using_hub() && active_ctl.gpio_initialized)
+				set_slave_wake();
 			break;
 		case STATE_HSIC_LPA_PHY_INIT:
 			mif_info("lpa_phy_init\n");
@@ -875,6 +808,7 @@ int get_cp_active_state(void)
 }
 
 /* For CBP7.2 EDPRAM (External DPRAM) */
+#define CBP_EDPRAM_BASE		SROM_CS1_BASE
 #define CBP_EDPRAM_SIZE		DPRAM_SIZE_16KB
 
 /*
@@ -883,8 +817,6 @@ int get_cp_active_state(void)
 static struct sromc_bank_cfg cbp_edpram_bank_cfg = {
 	.csn = 1,
 	.attr = SROMC_DATA_16 | SROMC_BYTE_EN,
-	.size = CBP_EDPRAM_SIZE,
-	.addr = SROM_CS1_BASE,
 };
 
 static struct sromc_timing_cfg cbp_edpram_timing_cfg = {
@@ -911,8 +843,8 @@ static struct resource cdma_modem_res[] = {
 	},
 	[RES_DPRAM_MEM_ID] = {
 		.name = "dpram_base",
-		.start = SROM_CS1_BASE,
-		.end = SROM_CS1_BASE + (CBP_EDPRAM_SIZE - 1),
+		.start = CBP_EDPRAM_BASE,
+		.end = CBP_EDPRAM_BASE + (CBP_EDPRAM_SIZE - 1),
 		.flags = IORESOURCE_MEM,
 	},
 	[RES_DPRAM_IRQ_ID] = {
@@ -961,35 +893,24 @@ static struct platform_device cdma_modem = {
 /* Set dynamic environment for a modem */
 static void setup_cdma_modem_env(void)
 {
-	unsigned int addr;
-	unsigned int end;
+#if !defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+	if (system_rev != 1 && system_rev < 4) {
+		unsigned int addr;
+		unsigned int end;
 
-	/* Config DPRAM control structure */
-	if (system_rev == 1 || system_rev >= 4) {
-		cbp_edpram_bank_cfg.csn = 1;
-		cbp_edpram_bank_cfg.addr = SROM_CS1_BASE;
-	} else {
 		cbp_edpram_bank_cfg.csn = 0;
-		cbp_edpram_bank_cfg.addr = SROM_CS0_BASE;
-	}
 
-	addr = cbp_edpram_bank_cfg.addr;
-	end = addr + cbp_edpram_bank_cfg.size - 1;
-	cdma_modem_res[RES_DPRAM_MEM_ID].start = addr;
-	cdma_modem_res[RES_DPRAM_MEM_ID].end = end;
+		addr = SROM_CS0_BASE;
+		end = addr + CBP_EDPRAM_SIZE - 1;
+		cdma_modem_res[RES_DPRAM_MEM_ID].start = addr;
+		cdma_modem_res[RES_DPRAM_MEM_ID].end = end;
 
-	if (system_rev == 1 || system_rev >= 4) {
-		cdma_modem_res[RES_DPRAM_IRQ_ID].start = CBP_DPRAM_INT_IRQ_01;
-		cdma_modem_res[RES_DPRAM_IRQ_ID].end = CBP_DPRAM_INT_IRQ_01;
-	} else {
 		cdma_modem_res[RES_DPRAM_IRQ_ID].start = CBP_DPRAM_INT_IRQ_00;
 		cdma_modem_res[RES_DPRAM_IRQ_ID].end = CBP_DPRAM_INT_IRQ_00;
-	}
 
-	if (system_rev == 1 || system_rev >= 4)
-		cdma_modem_data.gpio_dpram_int = GPIO_CBP_DPRAM_INT_01;
-	else
 		cdma_modem_data.gpio_dpram_int = GPIO_CBP_DPRAM_INT_00;
+	}
+#endif
 }
 
 static void config_cdma_modem_gpio(void)
@@ -1162,13 +1083,13 @@ static int usb3503_reset_n(int val)
 
 	/* hub off from cpuidle(LPA), skip the msleep schedule*/
 	if (val) {
-		msleep(20);
+		usleep_range(3000, 3100);
 		mif_info("val = %d\n", gpio_get_value(GPIO_USB_HUB_RST));
 
 		gpio_set_value(GPIO_USB_HUB_RST, !!val);
 
 		mif_info("val = %d\n", gpio_get_value(GPIO_USB_HUB_RST));
-		udelay(5); /* need it ?*/
+		usleep_range(7000, 7100);
 	}
 	return 0;
 }
@@ -1204,17 +1125,25 @@ static struct platform_device s3c_device_i2c20 = {
 static int host_port_enable(int port, int enable)
 {
 	int err;
+	static int pre_state = -1;
 
-	mif_info("port(%d) control(%d)\n", port, enable);
+	mif_info("port(%d) control(%d -> %d) by <%pf>\n", 
+			port, pre_state, enable, __builtin_return_address(0));
 
-	if (!modem_using_hub())
+	if (!enable && !pre_state) {
+		mif_info("hub state not changed. Skip state change !!!\n");
 		return 0;
+	}
+
+	pre_state = enable;
 
 	if (enable) {
-		err = usbhub_set_mode(usbhub_ctl, USB3503_MODE_HUB);
-		if (err < 0) {
-			mif_err("ERR: hub on fail\n");
-			goto exit;
+		if (modem_using_hub()) {
+			err = usbhub_set_mode(usbhub_ctl, USB3503_MODE_HUB);
+			if (err < 0) {
+				mif_err("ERR: hub on fail\n");
+				goto exit;
+			}
 		}
 		err = s5p_ehci_port_control(&s5p_device_ehci, port, 1);
 		if (err < 0) {
@@ -1222,10 +1151,12 @@ static int host_port_enable(int port, int enable)
 			goto exit;
 		}
 	} else {
-		err = usbhub_set_mode(usbhub_ctl, USB3503_MODE_STANDBY);
-		if (err < 0) {
-			mif_err("ERR: hub off fail\n");
-			goto exit;
+		if (modem_using_hub()) {
+			err = usbhub_set_mode(usbhub_ctl, USB3503_MODE_STANDBY);
+			if (err < 0) {
+				mif_err("ERR: hub off fail\n");
+				goto exit;
+			}
 		}
 		err = s5p_ehci_port_control(&s5p_device_ehci, port, 0);
 		if (err < 0) {
@@ -1234,6 +1165,7 @@ static int host_port_enable(int port, int enable)
 		}
 	}
 
+	mif_info("> H-ACT %d\n", enable);
 	err = gpio_direction_output(umts_modem_data.gpio_host_active, enable);
 	mif_info("active state err(%d), en(%d), level(%d)\n",
 		err, enable, gpio_get_value(umts_modem_data.gpio_host_active));
@@ -1260,6 +1192,14 @@ static int __init init_modem(void)
 	struct sromc_timing_cfg *tm_cfg;
 
 	mif_err("System Revision = %d\n", system_rev);
+
+#ifdef CONFIG_MACH_BAFFIN
+	umts_link_pm_data.has_usbhub = false;
+#endif
+#if defined(CONFIG_SEC_MODEM_C1_LGT)
+	if (system_rev >= 11)
+		umts_link_pm_data.has_usbhub = false;
+#endif
 
 	/*
 	** Complete modem_data configuration including link_pm_data
@@ -1300,12 +1240,6 @@ static int __init init_modem(void)
 
 	tm_cfg = &cbp_edpram_timing_cfg;
 	sromc_config_access_timing(bnk_cfg->csn, tm_cfg);
-
-	/*
-	** Remap SFR region for CMC22x IDPRAM
-	*/
-	if (!cmc_idpram_remap_sfr_region(&cmc_idpram_bank_cfg))
-		return -1;
 
 	/*
 	** Register the modem devices

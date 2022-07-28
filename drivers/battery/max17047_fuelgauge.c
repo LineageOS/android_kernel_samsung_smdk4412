@@ -64,6 +64,14 @@
 #undef	DEBUG_FUELGAUGE_POLLING
 #define MAX17047_POLLING_INTERVAL	10000
 
+/* rcomp update */
+#if defined(CONFIG_MACH_C1_KOR_SKT) || \
+	defined(CONFIG_MACH_C1_KOR_KT) || \
+	defined(CONFIG_MACH_C1_KOR_LGT)
+#define CHECK_RCOMP_UPDATE
+#define MAX17047_NEW_RCOMP	0x0070
+#endif
+
 /* adjust full soc */
 #define FULL_SOC_DEFAULT	9850
 #define FULL_SOC_LOW		9700

@@ -1038,7 +1038,9 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-#ifndef CONFIG_MACH_BAFFIN
+#if defined(CONFIG_MACH_C1_KOR_SKT) || defined(CONFIG_MACH_C1_KOR_KT) \
+	|| defined(CONFIG_MACH_BAFFIN_KOR_SKT) || defined(CONFIG_MACH_BAFFIN_KOR_KT)
+#else
 	struct snd_soc_codec *codec = rtd->codec;
 #endif
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
@@ -1160,7 +1162,17 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		dev_err(codec_dai->dev, "Unable to switch to FLL2: %d\n", ret);
 
-#ifndef CONFIG_MACH_BAFFIN
+#if defined(CONFIG_MACH_C1_KOR_SKT) || defined(CONFIG_MACH_C1_KOR_KT) \
+    || defined(CONFIG_MACH_BAFFIN_KOR_SKT) || defined(CONFIG_MACH_BAFFIN_KOR_KT)
+#elif defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+	if ((prate==16000) && (!(snd_soc_read(codec, WM8994_INTERRUPT_RAW_STATUS_2)
+		& WM8994_FLL2_LOCK_STS))) {
+		dev_info(codec_dai->dev, "%s: use mclk1 for FLL2\n", __func__);
+		ret = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2,
+			WM8994_FLL_SRC_MCLK1,
+			MIDAS_DEFAULT_MCLK1, prate * 256);
+	}
+#else
 	if (!(snd_soc_read(codec, WM8994_INTERRUPT_RAW_STATUS_2)
 		& WM8994_FLL2_LOCK_STS)) {
 		dev_info(codec_dai->dev, "%s: use mclk1 for FLL2\n", __func__);

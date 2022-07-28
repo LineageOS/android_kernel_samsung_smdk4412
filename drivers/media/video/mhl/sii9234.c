@@ -310,8 +310,19 @@ u8 mhl_onoff_ex(bool onoff)
 {
 	struct sii9234_data *sii9234 = dev_get_drvdata(sii9244_mhldev);
 	int ret;
+#ifdef	CONFIG_MACH_C1
+	int	retries = 30;
+#endif
 
 	pr_info("sii9234: %s(%s)\n", __func__, onoff ? "on" : "off");
+
+#ifdef	CONFIG_MACH_C1
+/* hdmi connect during resume operation normally takes 2 sec..	*/
+	while(sii9234->suspend_state == true && retries--) {
+		pr_info("sii9234: wait for device resume retries = %d\n", retries);
+		msleep(100);
+	}
+#endif
 
 	if (!sii9234 || !sii9234->pdata) {
 		pr_info("sii9234: mhl_onoff_ex: getting resource is failed\n");

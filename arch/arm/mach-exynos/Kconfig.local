@@ -150,6 +150,7 @@ config MACH_U1_KOR_KT
 
 config MACH_U1_KOR_LGT
 	bool "LG U+"
+	select FM34_WE395
 endchoice
 
 choice
